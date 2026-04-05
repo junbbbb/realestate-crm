@@ -95,9 +95,48 @@ python3 scripts/sync-to-supabase.py data/crawled-mapo-fin-YYYY-MM-DD.json
 
 ## 자동화
 
-### 옵션 A — GitHub Actions (권장)
-저장소에 `.github/workflows/crawl.yml`이 들어 있다. 매일 **새벽 5시 KST**에 Ubuntu
-runner 위에서 자동 실행되어 크롤링 → Supabase 동기화까지 수행한다.
+### 옵션 A — GitHub Actions + self-hosted runner (권장)
+저장소에 `.github/workflows/crawl.yml`이 들어 있다. 매일 **새벽 5시 KST**에
+**한국 IP(이모 Mac)의 self-hosted runner** 위에서 자동 실행되어 크롤링 → Supabase
+동기화까지 수행한다.
+
+#### 왜 self-hosted인가
+GitHub 무료 클라우드 runner(`ubuntu-latest`)는 미국/유럽에 있다. 네이버는
+`fin.land.naver.com` API를 해외 IP에서 호출하면 **30초 타임아웃**으로 지오블락한다
+(실제 테스트에서 첫 요청에서 curl: (28) timed out 발생). 한국 IP가 필수.
+
+self-hosted runner는 이모 Mac에 설치되는 작은 에이전트. GitHub Actions 웹 UI와
+워크플로우 파일은 그대로 쓰면서 실행만 로컬에서 일어난다. 쿠키 문제도 자동 해결 —
+runner가 로컬 Chrome에서 직접 꺼낼 수 있다.
+
+#### runner 설치 (최초 1회)
+1. https://github.com/junbbbb/realestate-crm/settings/actions/runners 접속
+2. "New self-hosted runner" → **macOS / ARM64** 선택
+3. 페이지에 나온 명령어를 터미널에서 순서대로 실행 (대략):
+   ```bash
+   mkdir -p ~/actions-runner && cd ~/actions-runner
+   curl -o actions-runner.tar.gz -L https://github.com/actions/runner/releases/download/vX.X.X/...
+   tar xzf actions-runner.tar.gz
+   ./config.sh --url https://github.com/junbbbb/realestate-crm --token <웹페이지에 표시되는 토큰>
+   ```
+4. 라벨 설정 시 `self-hosted, macOS`가 자동으로 붙음
+5. 백그라운드 서비스로 등록 (Mac 재부팅 후에도 자동 시작):
+   ```bash
+   ./svc.sh install
+   ./svc.sh start
+   ```
+
+#### 크론 절전 해제 (중요)
+Mac이 잠자기 상태면 워크플로우가 실행 안 된다. 매일 새벽 4:55에 깨우도록:
+```bash
+sudo pmset repeat wakeorpoweron MTWRFSU 04:55:00
+```
+
+#### Keychain 접근 권한
+self-hosted runner가 쿠키 추출 시 Keychain에 접근한다. 최초 실행 시 한 번
+"항상 허용" 다이얼로그가 뜨면 체크해두면 이후 자동 진행.
+
+#### 최초 1회 시크릿 등록
 
 #### 최초 1회 설정
 저장소 설정 → Secrets and variables → Actions 에 아래 3개 시크릿 등록:
