@@ -42,7 +42,8 @@ next-env.d.ts
 .env.local
 
 # Crawled data
-data/
+data/*
+!data/regions.json
 *.json.bak
 
 # Screenshots

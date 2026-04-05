@@ -1,0 +1,118 @@
+name: Daily Mapo Crawl
+
+# 매일 새벽 5시 KST (20:00 UTC 전날) 에 마포구 상업용 매물 크롤링 → Supabase 동기화
+on:
+  schedule:
+    - cron: "0 20 * * *"  # 05:00 Asia/Seoul
+  workflow_dispatch: {}    # 수동 실행 버튼도 제공
+
+concurrency:
+  group: crawl
+  cancel-in-progress: false
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      NAVER_COOKIE: ${{ secrets.NAVER_COOKIE }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install curl_cffi python-dotenv supabase
+
+      - name: Sanity check — secrets present
+        run: |
+          if [ -z "$NAVER_COOKIE" ]; then
+            echo "::error::NAVER_COOKIE secret 누락 — scripts/push-cookie-to-github.sh 실행 필요"
+            exit 1
+          fi
+          if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ] || [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
+            echo "::error::Supabase secret 누락"
+            exit 1
+          fi
+          echo "쿠키 길이: ${#NAVER_COOKIE} bytes"
+
+      - name: Crawl
+        id: crawl
+        run: |
+          mkdir -p data/crawl-logs
+          LOG="data/crawl-logs/gh-$(date +%Y-%m-%d).log"
+          python3 scripts/crawl-mapo-fin.py 2>&1 | tee "$LOG"
+          # 결과 파일 경로를 output으로 노출
+          JSON=$(ls -t data/crawled-mapo-fin-*.json | head -1)
+          echo "json=$JSON" >> "$GITHUB_OUTPUT"
+          echo "log=$LOG" >> "$GITHUB_OUTPUT"
+          echo "count=$(python3 -c "import json; print(len(json.load(open('$JSON'))))")" >> "$GITHUB_OUTPUT"
+
+      - name: Sync to Supabase
+        run: |
+          python3 scripts/sync-to-supabase.py "${{ steps.crawl.outputs.json }}"
+
+      - name: Upload crawl artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: crawl-${{ github.run_id }}
+          path: |
+            data/crawled-mapo-fin-*.json
+            data/crawl-logs/gh-*.log
+          retention-days: 14
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### 크롤링 결과" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 수집 건수: ${{ steps.crawl.outputs.count }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 로그: \`${{ steps.crawl.outputs.log }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- JSON: \`${{ steps.crawl.outputs.json }}\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Notify Telegram on failure
+        if: failure()
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -z "$TG_TOKEN" ] || [ -z "$TG_CHAT" ]; then
+            echo "Telegram secrets 미설정 — 알림 스킵"
+            exit 0
+          fi
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          MSG="❌ <b>마포구 크롤링 실패</b>
+          %0A저장소: <code>${{ github.repository }}</code>
+          %0A실행 번호: #${{ github.run_number }}
+          %0A시각: $(date '+%Y-%m-%d %H:%M KST' -d '+9 hours')
+          %0A%0A원인 확인: $RUN_URL
+          %0A%0A쿠키 만료일 수도 있음 → 로컬에서 <code>bash scripts/push-cookie-to-github.sh</code>"
+          curl -sS "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=${MSG}" \
+            -d "parse_mode=HTML" \
+            -d "disable_web_page_preview=true" > /dev/null
+
+      - name: Notify Telegram on success
+        if: success() && vars.TELEGRAM_NOTIFY_SUCCESS == 'true'
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -z "$TG_TOKEN" ] || [ -z "$TG_CHAT" ]; then exit 0; fi
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          MSG="✅ 마포구 크롤링 완료 — ${{ steps.crawl.outputs.count }}건%0A$RUN_URL"
+          curl -sS "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=${MSG}" > /dev/null

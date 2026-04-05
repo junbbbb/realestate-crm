@@ -58,12 +58,32 @@ http://localhost:3000 접속
 
 ## 크롤링
 
-네이버 부동산 API에서 마포구 전체 매물 수집:
+네이버 부동산(`fin.land.naver.com`)에서 마포구 상업용 매물(약 2만건)을 수집.
 
+**한 줄 실행:**
 ```bash
+bash scripts/run-crawl.sh
+```
+
+이 래퍼가 Chrome 쿠키 자동 추출 → 크롤링 → 로그 저장까지 전부 수행한다.
+
+**수동 단계별 실행:**
+```bash
+# 1. Chrome Default 프로파일에서 네이버 쿠키 추출 → .env.local 에 기록
+python3 scripts/extract-naver-cookie.py
+
+# 2. 마포구 26개 동 × 5개 매물유형 × 4개 거래유형 크롤링
 python3 scripts/crawl-mapo-fin.py
+
+# 3. Supabase 업로드
 python3 scripts/sync-to-supabase.py data/crawled-mapo-fin-YYYY-MM-DD.json
 ```
+
+**사전 준비 한 번만:**
+1. Chrome Default 프로파일로 https://fin.land.naver.com 로그인
+2. `pip3 install --user pycryptodome curl_cffi python-dotenv`
+
+자세한 동작 원리·장애 대응·자동화 설정은 [`docs/CRAWLING.md`](./docs/CRAWLING.md) 참고.
 
 ## 프로젝트 구조
 ```
