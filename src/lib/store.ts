@@ -1,0 +1,211 @@
+import { create } from "zustand";
+import { Property, Customer, PropertyFilters } from "@/types";
+import { mockCustomers } from "@/lib/mock-data";
+import { supabase, SupabaseProperty } from "@/lib/supabase";
+
+interface AppState {
+  properties: Property[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  customers: Customer[];
+  filters: PropertyFilters;
+  selectedPropertyId: string | null;
+  compareIds: string[];
+  loading: boolean;
+  dongList: string[];
+
+  loadProperties: () => Promise<void>;
+  loadDongList: () => Promise<void>;
+  setFilters: (f: Partial<PropertyFilters>) => void;
+  resetFilters: () => void;
+  setPage: (page: number) => void;
+  toggleFavorite: (id: string) => void;
+  deleteCustomer: (id: string) => void;
+  selectProperty: (id: string | null) => void;
+  toggleCompare: (id: string) => void;
+  clearCompare: () => void;
+}
+
+const defaultFilters: PropertyFilters = {
+  search: "",
+  dong: "전체",
+  propertyType: "전체",
+  dealType: "전체",
+  areaMin: 0,
+  areaMax: 0,
+  floorFilter: "전체",
+  sortBy: "default",
+};
+
+function mapSupabaseToProperty(row: SupabaseProperty): Property {
+  const floorParts = row.floor_info?.split("/") || [];
+  const floor = floorParts[0] ? parseInt(floorParts[0].replace(/\D/g, "")) || undefined : undefined;
+  const totalFloors = floorParts[1] ? parseInt(floorParts[1].replace(/\D/g, "")) || undefined : undefined;
+
+  return {
+    id: row.id,
+    title: row.description || row.article_name || `${row.dong} ${row.real_estate_type_name}`,
+    address: row.address,
+    propertyType: row.real_estate_type_name as Property["propertyType"],
+    dealType: row.trade_type_name as Property["dealType"],
+    price: row.price,
+    deposit: row.warrant_price || undefined,
+    monthlyRent: row.monthly_rent || undefined,
+    area: row.area2 || row.area1,
+    rooms: 1,
+    bathrooms: 1,
+    floor,
+    totalFloors,
+    description: row.description || "",
+    isFavorite: row.is_favorite || false,
+    isMyListing: row.is_my_listing || false,
+    createdAt: row.confirm_date || row.created_at,
+    features: row.tag_list || [],
+    contact: row.realtor_name || undefined,
+  };
+}
+
+export const useStore = create<AppState>((set, get) => ({
+  properties: [],
+  totalCount: 0,
+  page: 1,
+  pageSize: 50,
+  customers: mockCustomers,
+  filters: defaultFilters,
+  selectedPropertyId: null,
+  compareIds: [],
+  loading: false,
+  dongList: [],
+
+  loadDongList: async () => {
+    const { data } = await supabase
+      .from("properties")
+      .select("dong")
+      .eq("is_active", true);
+    if (data) {
+      const dongs = Array.from(new Set(data.map((r: { dong: string }) => r.dong).filter(Boolean))).sort();
+      set({ dongList: dongs });
+    }
+  },
+
+  loadProperties: async () => {
+    set({ loading: true });
+    try {
+      const { filters, page, pageSize } = get();
+
+      let query = supabase
+        .from("properties")
+        .select("*", { count: "exact" })
+        .eq("is_active", true);
+
+      // 동 필터
+      if (filters.dong && filters.dong !== "전체") {
+        query = query.eq("dong", filters.dong);
+      }
+
+      // 유형 필터
+      if (filters.propertyType && filters.propertyType !== "전체") {
+        query = query.eq("real_estate_type_name", filters.propertyType);
+      }
+
+      // 거래 필터
+      if (filters.dealType && filters.dealType !== "전체") {
+        query = query.eq("trade_type_name", filters.dealType);
+      }
+
+      // 검색 (설명/주소)
+      if (filters.search) {
+        query = query.or(
+          `description.ilike.%${filters.search}%,address.ilike.%${filters.search}%,article_name.ilike.%${filters.search}%`
+        );
+      }
+
+      // 면적 필터
+      if (filters.areaMin > 0) {
+        query = query.gte("area2", filters.areaMin);
+      }
+      if (filters.areaMax > 0) {
+        query = query.lte("area2", filters.areaMax);
+      }
+
+      // 정렬
+      if (filters.sortBy === "price-asc") {
+        query = query.order("price", { ascending: true });
+      } else if (filters.sortBy === "price-desc") {
+        query = query.order("price", { ascending: false });
+      } else {
+        query = query.order("last_seen_at", { ascending: false });
+      }
+
+      // 페이지네이션
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      query = query.range(from, to);
+
+      const { data, error, count } = await query;
+
+      if (error) {
+        console.error("Supabase error:", error);
+        set({ loading: false });
+        return;
+      }
+
+      const properties = (data || []).map(mapSupabaseToProperty);
+      set({
+        properties,
+        totalCount: count || 0,
+        loading: false,
+      });
+    } catch (e) {
+      console.error("Load error:", e);
+      set({ loading: false });
+    }
+  },
+
+  setFilters: (f) => {
+    set((s) => ({ filters: { ...s.filters, ...f }, page: 1 }));
+    get().loadProperties();
+  },
+
+  resetFilters: () => {
+    set({ filters: defaultFilters, page: 1 });
+    get().loadProperties();
+  },
+
+  setPage: (page) => {
+    set({ page });
+    get().loadProperties();
+  },
+
+  toggleFavorite: (id) => {
+    const current = get().properties.find((p) => p.id === id);
+    if (!current) return;
+    const newFav = !current.isFavorite;
+    set((s) => ({
+      properties: s.properties.map((p) =>
+        p.id === id ? { ...p, isFavorite: newFav } : p
+      ),
+    }));
+    supabase
+      .from("properties")
+      .update({ is_favorite: newFav })
+      .eq("id", id)
+      .then(({ error }) => {
+        if (error) console.error("Favorite sync error:", error);
+      });
+  },
+
+  deleteCustomer: (id) =>
+    set((s) => ({ customers: s.customers.filter((c) => c.id !== id) })),
+  selectProperty: (id) => set({ selectedPropertyId: id }),
+  toggleCompare: (id) =>
+    set((s) => ({
+      compareIds: s.compareIds.includes(id)
+        ? s.compareIds.filter((c) => c !== id)
+        : s.compareIds.length < 5
+          ? [...s.compareIds, id]
+          : s.compareIds,
+    })),
+  clearCompare: () => set({ compareIds: [] }),
+}));
