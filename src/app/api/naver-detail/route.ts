@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 
+export const runtime = "nodejs";
+export const preferredRegion = "icn1"; // Seoul — 네이버 API 지오블락 우회
+
 const NAVER_COOKIE = process.env.NAVER_COOKIE ?? "";
 const BASE = "https://fin.land.naver.com/front-api/v1/article";
 
