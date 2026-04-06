@@ -101,14 +101,14 @@ function NewDealForm({ onClose, onCreated }: { onClose: () => void; onCreated: (
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">동 *</p>
-              <Select value={dong} onValueChange={setDong}>
+              <Select value={dong} onValueChange={(v) => setDong(v ?? "")}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="동 선택" /></SelectTrigger>
                 <SelectContent>{dongList.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">유형</p>
-              <Select value={propertyType} onValueChange={setPropertyType}>
+              <Select value={propertyType} onValueChange={(v) => setPropertyType(v ?? "상가")}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>{propertyTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
               </Select>
@@ -117,7 +117,7 @@ function NewDealForm({ onClose, onCreated }: { onClose: () => void; onCreated: (
 
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">거래 유형</p>
-            <Select value={dealType} onValueChange={setDealType}>
+            <Select value={dealType} onValueChange={(v) => setDealType(v ?? "월세")}>
               <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>{dealTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
             </Select>

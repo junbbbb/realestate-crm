@@ -83,7 +83,7 @@ export const useDealStore = create<DealState>((set, get) => ({
 
   addDeal: async (d) => {
     // 거래전 컬럼 맨 위에 배치
-    const firstInColumn = get().deals.filter((x) => x.status === "��래전");
+    const firstInColumn = get().deals.filter((x) => x.status === DEAL_STATUSES[0]);
     const minPos = firstInColumn.length > 0 ? Math.min(...firstInColumn.map((x) => x.position)) : 1024;
     const newPos = minPos - 1024;
 

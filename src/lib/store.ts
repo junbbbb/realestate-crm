@@ -104,7 +104,7 @@ function mapSupabaseToProperty(row: SupabaseProperty): Property {
     contact: row.realtor_name || undefined,
     sourceUrl: row.source_url || undefined,
     memo: row.memo || undefined,
-    priceChange: row.price_change || "none",
+    priceChange: (row.price_change as Property["priceChange"]) || "none",
     prevPrice: row.prev_price || undefined,
   };
 }

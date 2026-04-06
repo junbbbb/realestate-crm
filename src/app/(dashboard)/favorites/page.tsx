@@ -73,32 +73,32 @@ export default function Favorites() {
   useEffect(() => {
     if (allIds.length === 0) { setPreviewMap({}); return; }
     setLoadingPreviews(true);
-    supabase
-      .from("properties")
-      .select("id, article_name, description, dong, real_estate_type, real_estate_type_name, trade_type, trade_type_name, price, warrant_price, monthly_rent, area1, area2, floor_info, address, memo")
-      .in("id", allIds)
-      .then(({ data }) => {
-        const map: Record<string, SimpleProperty> = {};
-        (data || []).forEach((r: Record<string, unknown>) => {
-          map[r.id as string] = {
-            id: r.id as string,
-            title: (r.description as string) || (r.article_name as string) || `${r.dong} ${r.real_estate_type_name}`,
-            address: r.address as string,
-            propertyType: r.real_estate_type_name as string,
-            dealType: r.trade_type_name as string,
-            realEstateTypeCode: (r.real_estate_type as string) || "",
-            tradeTypeCode: (r.trade_type as string) || "",
-            price: r.price as number,
-            deposit: (r.warrant_price as number) || undefined,
-            monthlyRent: (r.monthly_rent as number) || undefined,
-            area: (r.area2 as number) || (r.area1 as number),
-            floor: r.floor_info as string,
-            memo: (r.memo as string) || undefined,
-          };
-        });
-        setPreviewMap(map);
-      })
-      .finally(() => setLoadingPreviews(false));
+    (async () => {
+      const { data } = await supabase
+        .from("properties")
+        .select("id, article_name, description, dong, real_estate_type, real_estate_type_name, trade_type, trade_type_name, price, warrant_price, monthly_rent, area1, area2, floor_info, address, memo")
+        .in("id", allIds);
+      const map: Record<string, SimpleProperty> = {};
+      (data || []).forEach((r: Record<string, unknown>) => {
+        map[r.id as string] = {
+          id: r.id as string,
+          title: (r.description as string) || (r.article_name as string) || `${r.dong} ${r.real_estate_type_name}`,
+          address: r.address as string,
+          propertyType: r.real_estate_type_name as string,
+          dealType: r.trade_type_name as string,
+          realEstateTypeCode: (r.real_estate_type as string) || "",
+          tradeTypeCode: (r.trade_type as string) || "",
+          price: r.price as number,
+          deposit: (r.warrant_price as number) || undefined,
+          monthlyRent: (r.monthly_rent as number) || undefined,
+          area: (r.area2 as number) || (r.area1 as number),
+          floor: r.floor_info as string,
+          memo: (r.memo as string) || undefined,
+        };
+      });
+      setPreviewMap(map);
+      setLoadingPreviews(false);
+    })();
   }, [allIds]);
 
   // 컬렉션 상세 진입 시 — previewMap에서 재사용

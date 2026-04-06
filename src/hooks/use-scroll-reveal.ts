@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 export function useScrollReveal<T extends HTMLElement>() {
   const ref = useRef<T>(null);
   const thumbRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const update = useCallback(() => {
     const el = ref.current;

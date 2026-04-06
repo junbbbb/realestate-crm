@@ -789,14 +789,14 @@ function MyListingForm({ dongList, onClose, onSaved }: { dongList: string[]; onC
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">동 *</p>
-              <Select value={dong} onValueChange={setDong}>
+              <Select value={dong} onValueChange={(v) => setDong(v ?? "")}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="동 선택" /></SelectTrigger>
                 <SelectContent>{dongList.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">유형</p>
-              <Select value={propType} onValueChange={setPropType}>
+              <Select value={propType} onValueChange={(v) => setPropType(v ?? "상가")}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>{myListingPropTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
               </Select>
@@ -804,7 +804,7 @@ function MyListingForm({ dongList, onClose, onSaved }: { dongList: string[]; onC
           </div>
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">거래 유형</p>
-            <Select value={dealType} onValueChange={setDealType}>
+            <Select value={dealType} onValueChange={(v) => setDealType(v ?? "월세")}>
               <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>{myListingDealTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
             </Select>
@@ -881,6 +881,7 @@ export default function Properties() {
   const [rentMaxInput, setRentMaxInput] = useState("");
   const [settingsApplied, setSettingsApplied] = useState(false);
   const [showMyListingForm, setShowMyListingForm] = useState(false);
+  const [savedFilters, setSavedFilters] = useState<Record<string, Partial<typeof filters>>>({});
 
   useEffect(() => {
     function applySettings() {
@@ -927,18 +928,23 @@ export default function Properties() {
             <div>
               <h1 className="text-3xl font-bold">매물 목록</h1>
               <div className="flex gap-2 mt-2">
-                <button
-                  onClick={() => setFilters({ source: "전체" })}
-                  className={`text-sm px-3 py-1 rounded-md transition-colors ${filters.source === "전체" ? "bg-primary text-primary-foreground font-medium" : "text-muted-foreground hover:bg-accent"}`}
-                >전체</button>
-                <button
-                  onClick={() => setFilters({ source: "네이버" })}
-                  className={`text-sm px-3 py-1 rounded-md transition-colors ${filters.source === "네이버" ? "bg-primary text-primary-foreground font-medium" : "text-muted-foreground hover:bg-accent"}`}
-                >네이버</button>
-                <button
-                  onClick={() => setFilters({ source: "개인매물" })}
-                  className={`text-sm px-3 py-1 rounded-md transition-colors ${filters.source === "개인매물" ? "bg-primary text-primary-foreground font-medium" : "text-muted-foreground hover:bg-accent"}`}
-                >개인매물</button>
+                {(["전체", "네이버", "개인매물"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => {
+                      const { source: _s, ...rest } = filters;
+                      setSavedFilters((prev) => ({ ...prev, [filters.source]: rest }));
+                      if (tab === "개인매물") {
+                        // 개인매물: 필터 전부 초기화 + source만 설정 (한번에)
+                        setFilters({ search: "", dong: [], propertyType: "전체", dealType: "전체", areaMin: 0, areaMax: 0, priceMin: 0, priceMax: 0, rentMin: 0, rentMax: 0, floorFilter: "전체", sortBy: "default", source: tab });
+                      } else {
+                        const saved = savedFilters[tab];
+                        setFilters(saved ? { ...saved, source: tab } : { source: tab });
+                      }
+                    }}
+                    className={`text-sm px-3 py-1 rounded-md transition-colors ${filters.source === tab ? "bg-primary text-primary-foreground font-medium" : "text-muted-foreground hover:bg-accent"}`}
+                  >{tab}</button>
+                ))}
               </div>
             </div>
             <Button size="sm" className="gap-1.5" onClick={() => setShowMyListingForm(true)}>

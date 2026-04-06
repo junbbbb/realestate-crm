@@ -140,7 +140,7 @@ function CustomerForm({ onClose, initial }: { onClose: () => void; initial?: Cus
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">희망 층수</p>
-              <Select value={preferredFloor} onValueChange={setPreferredFloor}>
+              <Select value={preferredFloor} onValueChange={(v) => setPreferredFloor(v ?? "전체")}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>{floorOptions.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
               </Select>

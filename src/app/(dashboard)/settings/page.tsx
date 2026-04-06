@@ -123,7 +123,7 @@ export default function SettingsPage() {
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">동</p>
-                <Select value={defaultDong} onValueChange={setDefaultDong}>
+                <Select value={defaultDong} onValueChange={(v) => setDefaultDong(v ?? "전체")}>
                   <SelectTrigger className="h-9 bg-card text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="전체">전체</SelectItem>
@@ -133,7 +133,7 @@ export default function SettingsPage() {
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">유형</p>
-                <Select value={defaultPropertyType} onValueChange={setDefaultPropertyType}>
+                <Select value={defaultPropertyType} onValueChange={(v) => setDefaultPropertyType(v ?? "전체")}>
                   <SelectTrigger className="h-9 bg-card text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {["전체", "상가", "건물", "사무실", "상가주택"].map((t) => (
@@ -144,7 +144,7 @@ export default function SettingsPage() {
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">거래</p>
-                <Select value={defaultDealType} onValueChange={setDefaultDealType}>
+                <Select value={defaultDealType} onValueChange={(v) => setDefaultDealType(v ?? "전체")}>
                   <SelectTrigger className="h-9 bg-card text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {["전체", "매매", "전세", "월세", "단기임대"].map((t) => (

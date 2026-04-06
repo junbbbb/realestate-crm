@@ -38,7 +38,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   }, [loadCollections]);
 
   return (
-    <TooltipProvider delayDuration={0}>
+    <TooltipProvider>
       <div className="flex min-h-screen">
         {/* Sidebar: full on xl+, icon-only on smaller */}
         <aside className="shrink-0 bg-sidebar border-r border-sidebar-border flex flex-col w-14 xl:w-56 transition-all duration-200">
