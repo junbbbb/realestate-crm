@@ -776,7 +776,7 @@ function MyListingForm({ dongList, onClose, onSaved }: { dongList: string[]; onC
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-card border rounded-lg shadow-lg w-[480px] max-h-[90vh] overflow-y-auto">
+      <div className="bg-card border rounded-lg shadow-lg w-[calc(100vw-2rem)] sm:w-[480px] max-h-[90vh] overflow-y-auto">
         <div className="p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold">개인 매물 등록</h2>
@@ -921,12 +921,12 @@ export default function Properties() {
         </div>
       )}
 
-      <div className="flex gap-6 h-[calc(100vh-3.5rem)]">
+      <div className="flex flex-col md:flex-row gap-4 md:gap-6 md:h-[calc(100vh-3.5rem)]">
         {/* Left: table */}
-        <div className="flex-1 min-w-0 max-w-3xl flex flex-col">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h1 className="text-3xl font-bold">매물 목록</h1>
+        <div className="flex-1 min-w-0 md:max-w-3xl flex flex-col">
+          <div className="flex items-center justify-between mb-3 gap-2">
+            <div className="min-w-0">
+              <h1 className="text-2xl md:text-3xl font-bold">매물 목록</h1>
               <div className="flex gap-2 mt-2">
                 {(["전체", "네이버", "개인매물"] as const).map((tab) => (
                   <button
@@ -1170,27 +1170,34 @@ export default function Properties() {
           )}
         </div>
 
-        {/* Right: detail panel */}
-        <div className="w-[380px] shrink-0">
-          {selectedProperty ? (
-            <DetailPanel property={selectedProperty} onClose={() => selectProperty(null)} />
-          ) : (
-            <div className="h-full flex items-center justify-center border rounded-lg">
-              <div className="text-center">
-                <Building className="h-8 w-8 text-muted-foreground/20 mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">매물을 선택하면</p>
-                <p className="text-sm text-muted-foreground">상세 정보가 여기에 표시됩니다</p>
-              </div>
+        {/* Right: detail panel — desktop: side panel, mobile: full-screen overlay */}
+        {selectedProperty ? (
+          <>
+            {/* Mobile overlay */}
+            <div className="fixed inset-0 z-40 bg-background md:hidden overflow-y-auto">
+              <DetailPanel property={selectedProperty} onClose={() => selectProperty(null)} />
             </div>
-          )}
-        </div>
+            {/* Desktop side panel */}
+            <div className="hidden md:block w-[380px] shrink-0">
+              <DetailPanel property={selectedProperty} onClose={() => selectProperty(null)} />
+            </div>
+          </>
+        ) : (
+          <div className="hidden md:flex w-[380px] shrink-0 h-full items-center justify-center border rounded-lg">
+            <div className="text-center">
+              <Building className="h-8 w-8 text-muted-foreground/20 mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground">매물을 선택하면</p>
+              <p className="text-sm text-muted-foreground">상세 정보가 여기에 표시됩니다</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {showMyListingForm && <MyListingForm dongList={dongList} onClose={() => setShowMyListingForm(false)} onSaved={loadProperties} />}
 
       {/* Bottom floating action bar — 왼쪽 */}
       {compareIds.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 bg-card border rounded-xl shadow-lg px-5 py-3 flex items-center gap-4 animate-in slide-in-from-bottom-4 duration-200">
+        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-30 bg-card border rounded-xl shadow-lg px-3 md:px-5 py-3 flex items-center gap-2 md:gap-4 animate-in slide-in-from-bottom-4 duration-200 max-w-[calc(100vw-2rem)]">
           <span className="text-sm font-medium">{compareIds.length}개 선택</span>
           <Separator orientation="vertical" className="h-5" />
           <div className="relative">

@@ -244,7 +244,7 @@ export default function Favorites() {
           </div>
         )}
 
-        <div className="flex gap-6 h-[calc(100vh-10rem)]">
+        <div className="flex flex-col md:flex-row gap-4 md:gap-6 md:h-[calc(100vh-10rem)]">
           {/* 왼쪽: 테이블 */}
           <div className="flex-1 min-w-0 flex flex-col">
             {detailProperties.length === 0 ? (
@@ -297,22 +297,29 @@ export default function Favorites() {
             )}
           </div>
 
-          {/* 오른쪽: 상세 패널 */}
-          <div className="w-[380px] shrink-0">
-            {selectedProperty ? (
-              <DetailPanel property={selectedProperty} onClose={() => setSelectedPropertyId(null)} onMemoSaved={(id, memo) => {
-                setDetailProperties((prev) => prev.map((p) => p.id === id ? { ...p, memo: memo || undefined } : p));
-              }} />
-            ) : (
-              <div className="h-full flex items-center justify-center border rounded-lg">
-                <div className="text-center">
-                  <Building2 className="h-8 w-8 text-muted-foreground/20 mx-auto mb-3" />
-                  <p className="text-sm text-muted-foreground">매물을 선택하면</p>
-                  <p className="text-sm text-muted-foreground">상세 정보가 여기에 표시됩니다</p>
-                </div>
+          {/* 오른쪽: 상세 패널 — desktop: side, mobile: overlay */}
+          {selectedProperty ? (
+            <>
+              <div className="fixed inset-0 z-40 bg-background md:hidden overflow-y-auto">
+                <DetailPanel property={selectedProperty} onClose={() => setSelectedPropertyId(null)} onMemoSaved={(id, memo) => {
+                  setDetailProperties((prev) => prev.map((p) => p.id === id ? { ...p, memo: memo || undefined } : p));
+                }} />
               </div>
-            )}
-          </div>
+              <div className="hidden md:block w-[380px] shrink-0">
+                <DetailPanel property={selectedProperty} onClose={() => setSelectedPropertyId(null)} onMemoSaved={(id, memo) => {
+                  setDetailProperties((prev) => prev.map((p) => p.id === id ? { ...p, memo: memo || undefined } : p));
+                }} />
+              </div>
+            </>
+          ) : (
+            <div className="hidden md:flex w-[380px] shrink-0 h-full items-center justify-center border rounded-lg">
+              <div className="text-center">
+                <Building2 className="h-8 w-8 text-muted-foreground/20 mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">매물을 선택하면</p>
+                <p className="text-sm text-muted-foreground">상세 정보가 여기에 표시됩니다</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );

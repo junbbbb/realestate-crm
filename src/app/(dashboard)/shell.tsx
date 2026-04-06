@@ -29,6 +29,15 @@ const nav = [
   { label: "설정", href: "/settings", icon: Settings },
 ];
 
+/* Bottom tab nav items for mobile (5 items) */
+const mobileNav = [
+  { label: "대시보드", href: "/", icon: LayoutDashboard },
+  { label: "매물 목록", href: "/properties", icon: Building2 },
+  { label: "저장한 매물", href: "/favorites", icon: Bookmark },
+  { label: "고객", href: "/customers", icon: Users },
+  { label: "설정", href: "/settings", icon: Settings },
+];
+
 export default function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const loadCollections = useCollectionStore((s) => s.loadCollections);
@@ -40,8 +49,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   return (
     <TooltipProvider>
       <div className="flex min-h-screen">
-        {/* Sidebar: full on xl+, icon-only on smaller */}
-        <aside className="shrink-0 bg-sidebar border-r border-sidebar-border flex flex-col w-14 xl:w-56 transition-all duration-200">
+        {/* Sidebar: hidden on mobile, icon-only on md, full on xl+ */}
+        <aside className="hidden md:flex shrink-0 bg-sidebar border-r border-sidebar-border flex-col w-14 xl:w-56 transition-all duration-200">
           <div className="p-3 xl:p-6">
             <Link href="/" className="flex items-center gap-2.5 text-sidebar-foreground">
               <div className="h-8 w-8 rounded-lg bg-foreground flex items-center justify-center shrink-0">
@@ -80,10 +89,33 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         </aside>
 
         {/* Content */}
-        <main className="flex-1 py-4 px-6 overflow-auto">
+        <main className="flex-1 py-4 px-4 md:px-6 overflow-auto pb-20 md:pb-4">
           <div>{children}</div>
         </main>
         <Toaster />
+
+        {/* Mobile bottom tab navigation */}
+        <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-card border-t border-border">
+          <div className="flex items-center justify-around px-1 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+            {mobileNav.map((n) => {
+              const active = path === n.href;
+              return (
+                <Link
+                  key={n.href}
+                  href={n.href}
+                  className={`flex flex-col items-center gap-0.5 min-w-0 flex-1 py-1 rounded-lg transition-colors ${
+                    active
+                      ? "text-foreground"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  <n.icon className={`h-5 w-5 ${active ? "stroke-[2.5]" : ""}`} />
+                  <span className={`text-[10px] leading-tight truncate ${active ? "font-semibold" : ""}`}>{n.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
       </div>
     </TooltipProvider>
   );

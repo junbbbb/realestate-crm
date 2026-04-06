@@ -257,6 +257,8 @@ Primary key: `id` (네이버 articleNumber)
 - [x] 하단 플로팅 액션바 (다중 선택 시 컬렉션 저장 + 비교)
 - [x] 층 필터 (전체/1층/지하/2층 이상) — floor_info 컬럼 기반 서버사이드 필터
 - [x] 크롤링 자동화 (GitHub Actions workflow, 스크립트, 문서)
+- [x] 모바일 반응형 (하단 탭 바, 상세 오버레이, 필터 줄바꿈, safe area)
+- [x] PWA 지원 (manifest.json, 서비스워커, 오프라인 캐싱, 홈 화면 설치)
 
 ## 9. 미완료 (TODO)
 
@@ -291,7 +293,7 @@ Primary key: `id` (네이버 articleNumber)
 - [ ] 페이지 로딩 스켈레톤
 - [ ] 에러 상태 UI (Supabase 연결 실패 시)
 - [ ] 무한 스크롤 (현재 숫자 페이지네이션)
-- [ ] 모바일 최적화
+- [x] 모바일 반응형 + PWA (하단 탭 바, 상세 오버레이, safe area, manifest, 서비스워커)
 
 ## 10. 디자인 체크리스트 (DESIGN.md 참고)
 

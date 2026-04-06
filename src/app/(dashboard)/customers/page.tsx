@@ -66,7 +66,7 @@ function CustomerForm({ onClose, initial }: { onClose: () => void; initial?: Cus
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-card border rounded-lg shadow-lg w-[480px] max-h-[90vh] overflow-y-auto">
+      <div className="bg-card border rounded-lg shadow-lg w-[calc(100vw-2rem)] sm:w-[480px] max-h-[90vh] overflow-y-auto">
         <div className="p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold">{initial ? "고객 수정" : "고객 등록"}</h2>
