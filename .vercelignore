@@ -1,0 +1,5 @@
+data/
+scripts/
+docs/
+*.md
+!README.md
