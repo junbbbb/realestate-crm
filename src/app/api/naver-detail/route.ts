@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifyToken } from "@/lib/auth";
 
 const NAVER_COOKIE = process.env.NAVER_COOKIE ?? "";
 const BASE = "https://fin.land.naver.com/front-api/v1/article";
@@ -15,6 +16,11 @@ const headers: Record<string, string> = {
 };
 
 export async function GET(req: NextRequest) {
+  const token = req.cookies.get("crm-auth")?.value;
+  if (!token || !verifyToken(token)) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
   const articleNumber = req.nextUrl.searchParams.get("articleNumber");
   const realEstateType = req.nextUrl.searchParams.get("realEstateType");
   const tradeType = req.nextUrl.searchParams.get("tradeType");
