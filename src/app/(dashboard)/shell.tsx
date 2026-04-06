@@ -29,14 +29,7 @@ const nav = [
   { label: "설정", href: "/settings", icon: Settings },
 ];
 
-/* Bottom tab nav items for mobile (5 items) */
-const mobileNav = [
-  { label: "대시보드", href: "/", icon: LayoutDashboard },
-  { label: "매물 목록", href: "/properties", icon: Building2 },
-  { label: "저장한 매물", href: "/favorites", icon: Bookmark },
-  { label: "고객", href: "/customers", icon: Users },
-  { label: "설정", href: "/settings", icon: Settings },
-];
+const mobileNav = nav.filter((n) => n.href !== "/my-listings");
 
 export default function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();

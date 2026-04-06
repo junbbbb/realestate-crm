@@ -1170,18 +1170,11 @@ export default function Properties() {
           )}
         </div>
 
-        {/* Right: detail panel — desktop: side panel, mobile: full-screen overlay */}
+        {/* Right: detail panel — mobile: overlay, desktop: side panel */}
         {selectedProperty ? (
-          <>
-            {/* Mobile overlay */}
-            <div className="fixed inset-0 z-40 bg-background md:hidden overflow-y-auto">
-              <DetailPanel property={selectedProperty} onClose={() => selectProperty(null)} />
-            </div>
-            {/* Desktop side panel */}
-            <div className="hidden md:block w-[380px] shrink-0">
-              <DetailPanel property={selectedProperty} onClose={() => selectProperty(null)} />
-            </div>
-          </>
+          <div className="fixed inset-0 z-40 bg-background overflow-y-auto md:static md:z-auto md:bg-transparent md:overflow-visible md:w-[380px] md:shrink-0">
+            <DetailPanel property={selectedProperty} onClose={() => selectProperty(null)} />
+          </div>
         ) : (
           <div className="hidden md:flex w-[380px] shrink-0 h-full items-center justify-center border rounded-lg">
             <div className="text-center">

@@ -1,14 +1,7 @@
 const CACHE_NAME = "crm-v1";
-const STATIC_ASSETS = [
-  "/",
-  "/properties",
-  "/favorites",
-  "/customers",
-  "/settings",
-  "/manifest.json",
-];
+const STATIC_ASSETS = ["/manifest.json"];
 
-// Install: cache app shell
+// Install: cache only truly static assets
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
@@ -26,7 +19,7 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Fetch: network-first for API, cache-first for static
+// Fetch: network-first with selective caching
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -34,13 +27,15 @@ self.addEventListener("fetch", (event) => {
   // Skip non-GET
   if (request.method !== "GET") return;
 
-  // API requests: network-first with cache fallback
+  // API requests: network-first, only cache successful responses
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(
       fetch(request)
         .then((res) => {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
           return res;
         })
         .catch(() => caches.match(request))
@@ -57,8 +52,10 @@ self.addEventListener("fetch", (event) => {
       caches.match(request).then((cached) => {
         if (cached) return cached;
         return fetch(request).then((res) => {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
           return res;
         });
       })
@@ -66,14 +63,16 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // App shell / static: network-first
+  // App shell: network-first, only cache successful responses
   event.respondWith(
     fetch(request)
       .then((res) => {
-        const clone = res.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+        }
         return res;
       })
-      .catch(() => caches.match(request).then((cached) => cached || caches.match("/")))
+      .catch(() => caches.match(request))
   );
 });

@@ -297,20 +297,13 @@ export default function Favorites() {
             )}
           </div>
 
-          {/* 오른쪽: 상세 패널 — desktop: side, mobile: overlay */}
+          {/* 오른쪽: 상세 패널 — mobile: overlay, desktop: side panel */}
           {selectedProperty ? (
-            <>
-              <div className="fixed inset-0 z-40 bg-background md:hidden overflow-y-auto">
-                <DetailPanel property={selectedProperty} onClose={() => setSelectedPropertyId(null)} onMemoSaved={(id, memo) => {
-                  setDetailProperties((prev) => prev.map((p) => p.id === id ? { ...p, memo: memo || undefined } : p));
-                }} />
-              </div>
-              <div className="hidden md:block w-[380px] shrink-0">
-                <DetailPanel property={selectedProperty} onClose={() => setSelectedPropertyId(null)} onMemoSaved={(id, memo) => {
-                  setDetailProperties((prev) => prev.map((p) => p.id === id ? { ...p, memo: memo || undefined } : p));
-                }} />
-              </div>
-            </>
+            <div className="fixed inset-0 z-40 bg-background overflow-y-auto md:static md:z-auto md:bg-transparent md:overflow-visible md:w-[380px] md:shrink-0">
+              <DetailPanel property={selectedProperty} onClose={() => setSelectedPropertyId(null)} onMemoSaved={(id, memo) => {
+                setDetailProperties((prev) => prev.map((p) => p.id === id ? { ...p, memo: memo || undefined } : p));
+              }} />
+            </div>
           ) : (
             <div className="hidden md:flex w-[380px] shrink-0 h-full items-center justify-center border rounded-lg">
               <div className="text-center">
