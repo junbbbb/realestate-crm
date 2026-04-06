@@ -18,13 +18,14 @@ import { Separator } from "@/components/ui/separator";
 import {
   Heart, Search, RotateCcw, Inbox, X, MapPin, Ruler, BedDouble, Building, Phone,
   TrendingUp, Store, Users, FileText, BarChart3, Scale, Calculator, Plus, Bookmark,
-  Car, Bath, Flame, CalendarCheck, Loader2, KeyRound, ExternalLink, StickyNote,
+  Car, Bath, Flame, CalendarCheck, Loader2, KeyRound, ExternalLink, StickyNote, Handshake,
 } from "lucide-react";
 import {
   fetchNaverDetail, NaverDetailInfo,
   formatHeating, formatHeatingEnergy, formatMovingIn, formatApprovalDate,
 } from "@/lib/naver-detail";
 import { compressToEncodedURIComponent } from "lz-string";
+import { useDealStore } from "@/lib/deal-store";
 import { BookmarkButton, CollectionPopup } from "@/components/collection-popup";
 import NaverMap from "@/components/naver-map";
 import { useSettingsStore } from "@/lib/settings-store";
@@ -99,6 +100,7 @@ function CostSimulator({ property }: { property: Property }) {
 export function DetailPanel({ property, onClose, onMemoSaved }: { property: Property; onClose: () => void; onMemoSaved?: (id: string, memo: string) => void }) {
   const toggleFavorite = useStore((s) => s.toggleFavorite);
   const saveMemo = useStore((s) => s.saveMemo);
+  const addDeal = useDealStore((s) => s.addDeal);
   const { containerRef, thumbRef } = useScrollReveal<HTMLDivElement>();
   const [tab, setTab] = useState<"info" | "area" | "legal" | "cost">("info");
   const [detail, setDetail] = useState<NaverDetailInfo | null>(null);
@@ -194,6 +196,18 @@ export function DetailPanel({ property, onClose, onMemoSaved }: { property: Prop
             <p className="text-xs text-muted-foreground mt-1">권리금: {formatMoney(property.premiumKey)}</p>
           )}
         </div>
+
+        {/* 거래 시작 */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full text-sm gap-1.5"
+          onClick={async () => {
+            await addDeal({ propertyId: property.id, dealType: property.dealType });
+          }}
+        >
+          <Handshake className="h-4 w-4" />거래 시작
+        </Button>
 
         {/* Tabs */}
         <div className="flex gap-1 bg-secondary rounded-lg p-1">

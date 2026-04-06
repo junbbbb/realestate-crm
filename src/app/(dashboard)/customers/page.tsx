@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useCustomerStore, Customer } from "@/lib/customer-store";
+import { useCustomerStore, Customer, CustomerRole } from "@/lib/customer-store";
 import { formatMoney } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ function CustomerForm({ onClose, initial }: { onClose: () => void; initial?: Cus
   const updateCustomer = useCustomerStore((s) => s.updateCustomer);
 
   const [name, setName] = useState(initial?.name ?? "");
+  const [role, setRole] = useState<CustomerRole>(initial?.role ?? "buyer");
   const [phone, setPhone] = useState(initial?.phone ?? "");
   const [email, setEmail] = useState(initial?.email ?? "");
   const [memo, setMemo] = useState(initial?.memo ?? "");
@@ -43,6 +44,7 @@ function CustomerForm({ onClose, initial }: { onClose: () => void; initial?: Cus
       name: name.trim(),
       phone: phone.trim(),
       email: email.trim() || undefined,
+      role,
       memo: memo.trim(),
       interestedIn,
       budgetMin: (Number(budgetMin) || 0) * 10000,
@@ -80,9 +82,25 @@ function CustomerForm({ onClose, initial }: { onClose: () => void; initial?: Cus
             </div>
           </div>
 
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">이메일</p>
-            <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="이메일" className="h-9 text-sm" />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">역할 *</p>
+              <div className="flex gap-2">
+                {([["buyer", "임차인/매수인"], ["seller", "임대인/매도인"], ["both", "둘 다"]] as const).map(([v, label]) => (
+                  <button
+                    key={v}
+                    onClick={() => setRole(v)}
+                    className={`flex-1 px-2 py-1.5 rounded-md text-xs font-medium border transition-colors ${role === v ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">이메일</p>
+              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="이메일" className="h-9 text-sm" />
+            </div>
           </div>
 
           <div className="space-y-1">
@@ -193,7 +211,12 @@ export default function Customers() {
           {customers.map((c) => (
             <div key={c.id} className="bg-card rounded-lg border p-5 space-y-3 group">
               <div className="flex items-start justify-between">
-                <p className="font-bold text-base">{c.name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-bold text-base">{c.name}</p>
+                  <Badge variant="outline" className="text-[10px]">
+                    {c.role === "buyer" ? "임차인" : c.role === "seller" ? "임대인" : "임대인/임차인"}
+                  </Badge>
+                </div>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button className="p-1.5 rounded hover:bg-secondary" onClick={() => { setEditCustomer(c); setShowForm(true); }}>
                     <Pencil className="h-4 w-4 text-muted-foreground" />

@@ -2,11 +2,14 @@ import { create } from "zustand";
 import { supabase } from "@/lib/supabase";
 import { useToastStore } from "@/lib/toast-store";
 
+export type CustomerRole = "buyer" | "seller" | "both";
+
 export interface Customer {
   id: string;
   name: string;
   phone: string;
   email?: string;
+  role: CustomerRole;
   memo: string;
   interestedIn: string[];
   budgetMin: number;
@@ -48,6 +51,7 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
         name: r.name as string,
         phone: r.phone as string,
         email: (r.email as string) || undefined,
+        role: (r.role as CustomerRole) || "buyer",
         memo: (r.memo as string) || "",
         interestedIn: (r.interested_in as string[]) || [],
         budgetMin: r.budget_min as number,
@@ -67,6 +71,7 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
       name: c.name,
       phone: c.phone,
       email: c.email || null,
+      role: c.role || "buyer",
       memo: c.memo || "",
       interested_in: c.interestedIn,
       budget_min: c.budgetMin,
@@ -89,6 +94,7 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
     if (c.name !== undefined) row.name = c.name;
     if (c.phone !== undefined) row.phone = c.phone;
     if (c.email !== undefined) row.email = c.email || null;
+    if (c.role !== undefined) row.role = c.role;
     if (c.memo !== undefined) row.memo = c.memo;
     if (c.interestedIn !== undefined) row.interested_in = c.interestedIn;
     if (c.budgetMin !== undefined) row.budget_min = c.budgetMin;

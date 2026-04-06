@@ -8,7 +8,7 @@ import {
   LayoutDashboard,
   Building2,
   Bookmark,
-  FolderOpen,
+  Handshake,
   Users,
   Settings,
 } from "lucide-react";
@@ -24,7 +24,7 @@ const nav = [
   { label: "대시보드", href: "/", icon: LayoutDashboard },
   { label: "매물 목록", href: "/properties", icon: Building2 },
   { label: "저장한 매물", href: "/favorites", icon: Bookmark },
-  { label: "내 매물", href: "/my-listings", icon: FolderOpen },
+  { label: "거래 관리", href: "/my-listings", icon: Handshake },
   { label: "고객", href: "/customers", icon: Users },
   { label: "설정", href: "/settings", icon: Settings },
 ];
