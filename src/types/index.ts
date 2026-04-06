@@ -16,11 +16,14 @@ export interface Property {
   address: string;
   propertyType: PropertyType;
   dealType: DealType;
+  realEstateTypeCode: string;  // 네이버 코드 (D02 등)
+  tradeTypeCode: string;       // 네이버 코드 (B2 등)
   price: number;
   deposit?: number;
   monthlyRent?: number;
   premiumKey?: number; // 권리금 (만원)
-  area: number;
+  area: number;           // 대표 면적 (필터링 기준)
+  areaLabel: string;      // 면적 표시 텍스트
   rooms: number;
   bathrooms: number;
   floor?: number;
@@ -30,6 +33,7 @@ export interface Property {
   isMyListing: boolean;
   createdAt: string;
   contact?: string;
+  sourceUrl?: string;
   features: string[];
   tenants?: Tenant[]; // 층별 임차인
   buildingMemo?: string; // 건물 메모 (수선 등)

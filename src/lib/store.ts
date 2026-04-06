@@ -38,10 +38,38 @@ const defaultFilters: PropertyFilters = {
   sortBy: "default",
 };
 
+function buildAreaLabel(row: SupabaseProperty): { area: number; label: string } {
+  const raw = row.raw_data as Record<string, unknown> | null;
+  const space = (raw?.spaceInfo ?? (raw?.representativeArticleInfo as Record<string, unknown>)?.spaceInfo) as Record<string, number> | undefined;
+
+  const supply = row.area1 || space?.supplySpace || 0;
+  const exclusive = row.area2 || space?.exclusiveSpace || 0;
+  const land = space?.landSpace || 0;
+  const floorArea = space?.floorSpace || 0;
+
+  // 상가건물/빌딩: 대지+연면적
+  if (supply === 0 && exclusive === 0 && (land > 0 || floorArea > 0)) {
+    const parts: string[] = [];
+    if (land > 0) parts.push(`대지 ${land}m²`);
+    if (floorArea > 0) parts.push(`연 ${floorArea}m²`);
+    return { area: floorArea || land, label: parts.join(" / ") };
+  }
+
+  // 일반 상가/사무실: 계약+전용
+  if (supply > 0 && exclusive > 0 && supply !== exclusive) {
+    return { area: exclusive, label: `계약 ${supply}m² / 전용 ${exclusive}m²` };
+  }
+
+  // 면적 하나만 있는 경우
+  const a = exclusive || supply;
+  return { area: a, label: `${a}m²` };
+}
+
 function mapSupabaseToProperty(row: SupabaseProperty): Property {
   const floorParts = row.floor_info?.split("/") || [];
   const floor = floorParts[0] ? parseInt(floorParts[0].replace(/\D/g, "")) || undefined : undefined;
   const totalFloors = floorParts[1] ? parseInt(floorParts[1].replace(/\D/g, "")) || undefined : undefined;
+  const { area, label: areaLabel } = buildAreaLabel(row);
 
   return {
     id: row.id,
@@ -49,10 +77,13 @@ function mapSupabaseToProperty(row: SupabaseProperty): Property {
     address: row.address,
     propertyType: row.real_estate_type_name as Property["propertyType"],
     dealType: row.trade_type_name as Property["dealType"],
+    realEstateTypeCode: row.real_estate_type || "",
+    tradeTypeCode: row.trade_type || "",
     price: row.price,
     deposit: row.warrant_price || undefined,
     monthlyRent: row.monthly_rent || undefined,
-    area: row.area2 || row.area1,
+    area,
+    areaLabel,
     rooms: 1,
     bathrooms: 1,
     floor,
@@ -63,6 +94,7 @@ function mapSupabaseToProperty(row: SupabaseProperty): Property {
     createdAt: row.confirm_date || row.created_at,
     features: row.tag_list || [],
     contact: row.realtor_name || undefined,
+    sourceUrl: row.source_url || undefined,
   };
 }
 

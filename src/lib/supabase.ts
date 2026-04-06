@@ -9,7 +9,9 @@ export type SupabaseProperty = {
   id: string;
   article_no: string;
   article_name: string;
+  real_estate_type: string;
   real_estate_type_name: string;
+  trade_type: string;
   trade_type_name: string;
   dong: string;
   address: string;
@@ -32,5 +34,6 @@ export type SupabaseProperty = {
   is_favorite: boolean;
   is_my_listing: boolean;
   memo: string | null;
+  raw_data: Record<string, unknown> | null;
   created_at: string;
 };
