@@ -59,7 +59,6 @@ export default function Favorites() {
 
   // 상세 보기용
   const [detailProperties, setDetailProperties] = useState<SimpleProperty[]>([]);
-  const [loadingDetail, setLoadingDetail] = useState(false);
 
   const activeCollection = activeCollectionId
     ? collections.find((c) => c.id === activeCollectionId)
@@ -248,11 +247,7 @@ export default function Favorites() {
         <div className="flex gap-6 h-[calc(100vh-10rem)]">
           {/* 왼쪽: 테이블 */}
           <div className="flex-1 min-w-0 flex flex-col">
-            {loadingDetail ? (
-              <div className="text-center py-20">
-                <Loader2 className="h-8 w-8 mx-auto text-muted-foreground/50 animate-spin" />
-              </div>
-            ) : detailProperties.length === 0 ? (
+            {detailProperties.length === 0 ? (
               <div className="text-center py-20">
                 <FolderOpen className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
                 <p className="font-medium">이 컬렉션이 비어있습니다</p>

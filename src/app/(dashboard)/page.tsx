@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useStore } from "@/lib/store";
 import { useCollectionStore } from "@/lib/collection-store";
-import { supabase } from "@/lib/supabase";
 import { formatMoney, formatPrice } from "@/lib/format";
 import { Building2, Heart, FolderOpen, Users, TrendingUp, MapPin, Bookmark, Clock } from "lucide-react";
 
@@ -12,15 +11,9 @@ export default function Dashboard() {
   const totalCount = useStore((s) => s.totalCount);
   const loadProperties = useStore((s) => s.loadProperties);
   const collections = useCollectionStore((s) => s.collections);
-  const [realTotalCount, setRealTotalCount] = useState(0);
 
   useEffect(() => {
     loadProperties();
-    supabase
-      .from("properties")
-      .select("id", { count: "exact", head: true })
-      .eq("is_active", true)
-      .then(({ count }) => setRealTotalCount(count || 0));
   }, [loadProperties]);
 
   const favorites = useMemo(() => properties.filter((p) => p.isFavorite), [properties]);
@@ -38,7 +31,7 @@ export default function Dashboard() {
   }, [collections]);
 
   const stats = [
-    { label: "마포구 전체매물", value: realTotalCount, unit: "건", icon: Building2 },
+    { label: "마포구 전체매물", value: totalCount, unit: "건", icon: Building2 },
     { label: "컬렉션", value: collections.length, unit: "개", icon: Bookmark },
     { label: "내 매물", value: myListings.length, unit: "건", icon: FolderOpen },
     { label: "고객", value: 0, unit: "명", icon: Users },

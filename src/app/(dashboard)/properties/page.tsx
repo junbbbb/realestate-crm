@@ -109,10 +109,10 @@ export function DetailPanel({ property, onClose, onMemoSaved }: { property: Prop
   useEffect(() => { setMemoValue(property.memo ?? ""); }, [property.id, property.memo]);
 
   useEffect(() => {
-    setDetail(null);
     setDetailLoading(true);
     fetchNaverDetail(property.id, property.realEstateTypeCode, property.tradeTypeCode)
       .then((d) => setDetail(d))
+      .catch(() => setDetail(null))
       .finally(() => setDetailLoading(false));
   }, [property.id, property.realEstateTypeCode, property.tradeTypeCode]);
 
@@ -609,27 +609,23 @@ export default function Properties() {
   const [settingsApplied, setSettingsApplied] = useState(false);
 
   useEffect(() => {
-    // zustand persist hydration 대기 후 설정 적용
-    const unsub = useSettingsStore.persist.onFinishHydration(() => {
+    function applySettings() {
       const s = useSettingsStore.getState();
+      if (s.pageSize !== pageSize) useStore.getState().setPageSize(s.pageSize);
       const initFilters: Record<string, unknown> = {};
       if (s.defaultDong !== "전체") initFilters.dong = [s.defaultDong];
       if (s.defaultPropertyType !== "전체") initFilters.propertyType = s.defaultPropertyType;
       if (s.defaultDealType !== "전체") initFilters.dealType = s.defaultDealType;
-      if (Object.keys(initFilters).length > 0) setFilters(initFilters);
-      setSettingsApplied(true);
-    });
-    // 이미 hydrate 됐을 수 있음
-    if (useSettingsStore.persist.hasHydrated()) {
-      const s = useSettingsStore.getState();
-      const initFilters: Record<string, unknown> = {};
-      if (s.defaultDong !== "전체") initFilters.dong = [s.defaultDong];
-      if (s.defaultPropertyType !== "전체") initFilters.propertyType = s.defaultPropertyType;
-      if (s.defaultDealType !== "전체") initFilters.dealType = s.defaultDealType;
-      if (Object.keys(initFilters).length > 0) setFilters(initFilters);
+      if (Object.keys(initFilters).length > 0) {
+        setFilters(initFilters);
+      } else {
+        loadProperties();
+      }
       setSettingsApplied(true);
     }
-    loadProperties();
+    const unsub = useSettingsStore.persist.onFinishHydration(applySettings);
+    if (useSettingsStore.persist.hasHydrated()) applySettings();
+    else loadProperties();
     loadDongList();
     return unsub;
   // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,4 +1,6 @@
 export type PropertyType = "상가" | "건물" | "사무실" | "상가주택" | "상가건물" | "기타";
+export type TradeStatus = "active" | "sold";
+export type PriceChange = "none" | "increase" | "decrease" | "new";
 export type DealType = "매매" | "전세" | "월세" | "단기임대";
 
 export interface Tenant {
@@ -35,7 +37,7 @@ export interface Property {
   contact?: string;
   sourceUrl?: string;
   memo?: string;
-  priceChange?: string; // none, increase, decrease, new
+  priceChange?: PriceChange;
   prevPrice?: number;
   features: string[];
   tenants?: Tenant[]; // 층별 임차인

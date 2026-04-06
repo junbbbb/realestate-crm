@@ -3,6 +3,8 @@ import { Property, PropertyFilters } from "@/types";
 import { supabase, SupabaseProperty } from "@/lib/supabase";
 import { useToastStore } from "@/lib/toast-store";
 
+let _searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
 interface AppState {
   properties: Property[];
   totalCount: number;
@@ -19,6 +21,7 @@ interface AppState {
   setFilters: (f: Partial<PropertyFilters>) => void;
   resetFilters: () => void;
   setPage: (page: number) => void;
+  setPageSize: (size: number) => void;
   toggleFavorite: (id: string) => void;
   selectProperty: (id: string | null) => void;
   toggleCompare: (id: string) => void;
@@ -240,11 +243,9 @@ export const useStore = create<AppState>((set, get) => ({
 
   setFilters: (f) => {
     set((s) => ({ filters: { ...s.filters, ...f }, page: 1 }));
-    // debounce search input, immediate for other filters
     if ("search" in f && Object.keys(f).length === 1) {
-      clearTimeout((get() as unknown as { _searchTimer?: ReturnType<typeof setTimeout> })._searchTimer);
-      const timer = setTimeout(() => get().loadProperties(), 300);
-      (get() as unknown as { _searchTimer?: ReturnType<typeof setTimeout> })._searchTimer = timer;
+      if (_searchDebounceTimer) clearTimeout(_searchDebounceTimer);
+      _searchDebounceTimer = setTimeout(() => get().loadProperties(), 300);
     } else {
       get().loadProperties();
     }
@@ -257,6 +258,10 @@ export const useStore = create<AppState>((set, get) => ({
 
   setPage: (page) => {
     set({ page });
+    get().loadProperties();
+  },
+  setPageSize: (size) => {
+    set({ pageSize: size, page: 1 });
     get().loadProperties();
   },
 
