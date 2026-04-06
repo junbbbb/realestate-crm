@@ -1,14 +1,13 @@
 import { create } from "zustand";
-import { Property, Customer, PropertyFilters } from "@/types";
-import { mockCustomers } from "@/lib/mock-data";
+import { Property, PropertyFilters } from "@/types";
 import { supabase, SupabaseProperty } from "@/lib/supabase";
+import { useToastStore } from "@/lib/toast-store";
 
 interface AppState {
   properties: Property[];
   totalCount: number;
   page: number;
   pageSize: number;
-  customers: Customer[];
   filters: PropertyFilters;
   selectedPropertyId: string | null;
   compareIds: string[];
@@ -21,19 +20,23 @@ interface AppState {
   resetFilters: () => void;
   setPage: (page: number) => void;
   toggleFavorite: (id: string) => void;
-  deleteCustomer: (id: string) => void;
   selectProperty: (id: string | null) => void;
   toggleCompare: (id: string) => void;
   clearCompare: () => void;
+  saveMemo: (id: string, memo: string) => void;
 }
 
 const defaultFilters: PropertyFilters = {
   search: "",
-  dong: "전체",
+  dong: [],
   propertyType: "전체",
   dealType: "전체",
   areaMin: 0,
   areaMax: 0,
+  priceMin: 0,
+  priceMax: 0,
+  rentMin: 0,
+  rentMax: 0,
   floorFilter: "전체",
   sortBy: "default",
 };
@@ -75,7 +78,7 @@ function mapSupabaseToProperty(row: SupabaseProperty): Property {
     id: row.id,
     title: row.description || row.article_name || `${row.dong} ${row.real_estate_type_name}`,
     address: row.address,
-    propertyType: row.real_estate_type_name as Property["propertyType"],
+    propertyType: (row.real_estate_type_name === "상가건물" ? "건물" : row.real_estate_type_name) as Property["propertyType"],
     dealType: row.trade_type_name as Property["dealType"],
     realEstateTypeCode: row.real_estate_type || "",
     tradeTypeCode: row.trade_type || "",
@@ -95,6 +98,9 @@ function mapSupabaseToProperty(row: SupabaseProperty): Property {
     features: row.tag_list || [],
     contact: row.realtor_name || undefined,
     sourceUrl: row.source_url || undefined,
+    memo: row.memo || undefined,
+    priceChange: row.price_change || "none",
+    prevPrice: row.prev_price || undefined,
   };
 }
 
@@ -103,7 +109,6 @@ export const useStore = create<AppState>((set, get) => ({
   totalCount: 0,
   page: 1,
   pageSize: 50,
-  customers: mockCustomers,
   filters: defaultFilters,
   selectedPropertyId: null,
   compareIds: [],
@@ -132,13 +137,17 @@ export const useStore = create<AppState>((set, get) => ({
         .eq("is_active", true);
 
       // 동 필터
-      if (filters.dong && filters.dong !== "전체") {
-        query = query.eq("dong", filters.dong);
+      if (filters.dong.length > 0) {
+        query = query.in("dong", filters.dong);
       }
 
       // 유형 필터
       if (filters.propertyType && filters.propertyType !== "전체") {
-        query = query.eq("real_estate_type_name", filters.propertyType);
+        if (filters.propertyType === "건물") {
+          query = query.in("real_estate_type_name", ["건물", "상가건물"]);
+        } else {
+          query = query.eq("real_estate_type_name", filters.propertyType);
+        }
       }
 
       // 거래 필터
@@ -179,6 +188,22 @@ export const useStore = create<AppState>((set, get) => ({
         query = query.lte("area2", filters.areaMax);
       }
 
+      // 가격 필터 (DB는 원 단위, 필터는 만원 단위)
+      if (filters.priceMin > 0) {
+        query = query.gte("price", filters.priceMin * 10000);
+      }
+      if (filters.priceMax > 0) {
+        query = query.lte("price", filters.priceMax * 10000);
+      }
+
+      // 월세 필터
+      if (filters.rentMin > 0) {
+        query = query.gte("monthly_rent", filters.rentMin * 10000);
+      }
+      if (filters.rentMax > 0) {
+        query = query.lte("monthly_rent", filters.rentMax * 10000);
+      }
+
       // 정렬
       if (filters.sortBy === "price-asc") {
         query = query.order("price", { ascending: true });
@@ -215,7 +240,14 @@ export const useStore = create<AppState>((set, get) => ({
 
   setFilters: (f) => {
     set((s) => ({ filters: { ...s.filters, ...f }, page: 1 }));
-    get().loadProperties();
+    // debounce search input, immediate for other filters
+    if ("search" in f && Object.keys(f).length === 1) {
+      clearTimeout((get() as unknown as { _searchTimer?: ReturnType<typeof setTimeout> })._searchTimer);
+      const timer = setTimeout(() => get().loadProperties(), 300);
+      (get() as unknown as { _searchTimer?: ReturnType<typeof setTimeout> })._searchTimer = timer;
+    } else {
+      get().loadProperties();
+    }
   },
 
   resetFilters: () => {
@@ -246,8 +278,6 @@ export const useStore = create<AppState>((set, get) => ({
       });
   },
 
-  deleteCustomer: (id) =>
-    set((s) => ({ customers: s.customers.filter((c) => c.id !== id) })),
   selectProperty: (id) => set({ selectedPropertyId: id }),
   toggleCompare: (id) =>
     set((s) => ({
@@ -258,4 +288,19 @@ export const useStore = create<AppState>((set, get) => ({
           : s.compareIds,
     })),
   clearCompare: () => set({ compareIds: [] }),
+  saveMemo: (id, memo) => {
+    set((s) => ({
+      properties: s.properties.map((p) =>
+        p.id === id ? { ...p, memo: memo || undefined } : p
+      ),
+    }));
+    supabase
+      .from("properties")
+      .update({ memo: memo || null })
+      .eq("id", id)
+      .then(({ error }) => {
+        if (error) console.error("Memo sync error:", error);
+        else useToastStore.getState().show("메모가 저장되었습니다");
+      });
+  },
 }));

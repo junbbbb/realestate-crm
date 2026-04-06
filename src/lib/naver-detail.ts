@@ -13,6 +13,7 @@ export interface NaverDetailInfo {
   // basicInfo - articleDetailInfo
   buildingUse?: string;
   isIllegalBuilding?: boolean;
+  articleDescription?: string;
   coordinates?: { xCoordinate: number; yCoordinate: number };
   // basicInfo - movingInInfo
   movingInType?: string;
@@ -78,6 +79,7 @@ export async function fetchNaverDetail(
       if (article) {
         detail.buildingUse = article.buildingUse;
         detail.isIllegalBuilding = article.isIllegalBuilding;
+        detail.articleDescription = article.articleDescription;
         detail.coordinates = article.coordinates;
       }
       if (moving) {

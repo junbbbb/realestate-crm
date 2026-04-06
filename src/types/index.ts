@@ -1,4 +1,4 @@
-export type PropertyType = "아파트" | "오피스텔" | "빌라" | "상가" | "사무실" | "건물" | "상가건물" | "토지" | "원룸" | "기타";
+export type PropertyType = "상가" | "건물" | "사무실" | "상가주택" | "상가건물" | "기타";
 export type DealType = "매매" | "전세" | "월세" | "단기임대";
 
 export interface Tenant {
@@ -34,6 +34,9 @@ export interface Property {
   createdAt: string;
   contact?: string;
   sourceUrl?: string;
+  memo?: string;
+  priceChange?: string; // none, increase, decrease, new
+  prevPrice?: number;
   features: string[];
   tenants?: Tenant[]; // 층별 임차인
   buildingMemo?: string; // 건물 메모 (수선 등)
@@ -56,20 +59,30 @@ export interface Customer {
   history?: { date: string; note: string }[]; // 추천 히스토리
 }
 
+export interface CollectionEntry {
+  propertyId: string;
+  addedAt: string;
+}
+
 export interface Collection {
   id: string;
   name: string;
   propertyIds: string[];
+  entries?: CollectionEntry[];
   createdAt: string;
 }
 
 export interface PropertyFilters {
   search: string;
-  dong: string; // "전체" or 동 이름
+  dong: string[]; // [] = 전체, ["합정동","서교동"] = 선택된 동
   propertyType: PropertyType | "전체";
   dealType: DealType | "전체";
   areaMin: number;
   areaMax: number;
+  priceMin: number;
+  priceMax: number;
+  rentMin: number;
+  rentMax: number;
   floorFilter: "전체" | "1층" | "지하" | "2층 이상";
   sortBy: "default" | "yield" | "price-asc" | "price-desc";
 }

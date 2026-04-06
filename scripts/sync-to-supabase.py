@@ -59,7 +59,7 @@ def map_fin_article(item, dong=None):
     trade_map = {"A1": "매매", "B1": "전세", "B2": "월세", "B3": "단기임대"}
 
     real_estate_type = info.get("realEstateType", "")
-    prop_map = {"D02": "상가", "D03": "상가건물", "D04": "건물", "E01": "사무실", "Z00": "기타"}
+    prop_map = {"D01": "사무실", "D02": "상가", "D03": "건물", "D04": "건물", "D05": "상가주택", "E01": "건물", "Z00": "건물"}
 
     # 가격 텍스트 만들기
     if trade_type == "A1":
@@ -143,6 +143,8 @@ def main():
         prev = existing.get(aid)
         if prev is None:
             # 신규 매물 — initial price
+            row["price_change"] = "new"
+            row["prev_price"] = 0
             price_history_rows.append({
                 "article_no": aid,
                 "deal_or_warrant_price": row["deal_or_warrant_price"],
@@ -154,10 +156,13 @@ def main():
             })
         else:
             # 가격 변경 체크
+            prev_price = prev.get("price") or 0
             prev_warrant = prev.get("warrant_price") or 0
             prev_rent = prev.get("monthly_rent") or 0
-            if prev_warrant != row["warrant_price"] or prev_rent != row["monthly_rent"]:
-                change_type = "increase" if row["price"] > (prev.get("price") or 0) else "decrease"
+            if prev_warrant != row["warrant_price"] or prev_rent != row["monthly_rent"] or prev_price != row["price"]:
+                change_type = "increase" if row["price"] > prev_price else "decrease"
+                row["price_change"] = change_type
+                row["prev_price"] = prev_price
                 price_history_rows.append({
                     "article_no": aid,
                     "deal_or_warrant_price": row["deal_or_warrant_price"],
@@ -167,6 +172,9 @@ def main():
                     "price": row["price"],
                     "change_type": change_type,
                 })
+            else:
+                row["price_change"] = "none"
+                row["prev_price"] = prev_price
 
     print(f"가격 히스토리: {len(price_history_rows)}건 (신규/변경)")
 

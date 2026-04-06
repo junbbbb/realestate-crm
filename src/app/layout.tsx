@@ -15,7 +15,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
         />
       </head>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        {children}
+        <script
+          src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID}`}
+          defer
+        />
+      </body>
     </html>
   );
 }

@@ -51,10 +51,11 @@ export function CollectionPopup({ propertyIds, onClose, anchorRect }: Collection
     onClose();
   }
 
-  function handleCreate() {
+  async function handleCreate() {
     const trimmed = newName.trim();
     if (!trimmed) return;
-    const id = addCollection(trimmed);
+    const id = await addCollection(trimmed);
+    if (!id) return;
     addToCollection(id, propertyIds);
     onClose();
   }

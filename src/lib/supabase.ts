@@ -34,6 +34,8 @@ export type SupabaseProperty = {
   is_favorite: boolean;
   is_my_listing: boolean;
   memo: string | null;
+  price_change: string | null;
+  prev_price: number | null;
   raw_data: Record<string, unknown> | null;
   created_at: string;
 };

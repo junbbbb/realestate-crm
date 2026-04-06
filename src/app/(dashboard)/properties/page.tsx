@@ -18,7 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Heart, Search, RotateCcw, Inbox, X, MapPin, Ruler, BedDouble, Building, Phone,
   TrendingUp, Store, Users, FileText, BarChart3, Scale, Calculator, Plus, Bookmark,
-  Car, Bath, Flame, CalendarCheck, Loader2, KeyRound, ExternalLink,
+  Car, Bath, Flame, CalendarCheck, Loader2, KeyRound, ExternalLink, StickyNote,
 } from "lucide-react";
 import {
   fetchNaverDetail, NaverDetailInfo,
@@ -26,9 +26,11 @@ import {
 } from "@/lib/naver-detail";
 import { compressToEncodedURIComponent } from "lz-string";
 import { BookmarkButton, CollectionPopup } from "@/components/collection-popup";
+import NaverMap from "@/components/naver-map";
+import { useSettingsStore } from "@/lib/settings-store";
 
-const propertyTypes: (PropertyType | "전체")[] = ["전체", "아파트", "오피스텔", "빌라", "상가", "토지", "원룸"];
-const dealTypes: (DealType | "전체")[] = ["전체", "매매", "전세", "월세"];
+const propertyTypes: (PropertyType | "전체")[] = ["전체", "상가", "건물", "사무실", "상가주택"];
+const dealTypes: (DealType | "전체")[] = ["전체", "매매", "전세", "월세", "단기임대"];
 const floorOptions = ["전체", "1층", "지하", "2층 이상"] as const;
 const sortOptions = [
   { value: "default", label: "기본" },
@@ -94,12 +96,17 @@ function CostSimulator({ property }: { property: Property }) {
 }
 
 /* ── Detail Panel ── */
-function DetailPanel({ property, onClose }: { property: Property; onClose: () => void }) {
+export function DetailPanel({ property, onClose, onMemoSaved }: { property: Property; onClose: () => void; onMemoSaved?: (id: string, memo: string) => void }) {
   const toggleFavorite = useStore((s) => s.toggleFavorite);
+  const saveMemo = useStore((s) => s.saveMemo);
   const { containerRef, thumbRef } = useScrollReveal<HTMLDivElement>();
   const [tab, setTab] = useState<"info" | "area" | "legal" | "cost">("info");
   const [detail, setDetail] = useState<NaverDetailInfo | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [memoValue, setMemoValue] = useState(property.memo ?? "");
+  const memoChanged = memoValue !== (property.memo ?? "");
+
+  useEffect(() => { setMemoValue(property.memo ?? ""); }, [property.id, property.memo]);
 
   useEffect(() => {
     setDetail(null);
@@ -137,51 +144,54 @@ function DetailPanel({ property, onClose }: { property: Property; onClose: () =>
             </div>
             <h2 className="text-xl font-bold mt-2">{property.title}</h2>
           </div>
-          <div className="flex items-center gap-1">
-            <a
-              href={(() => {
-                const lng = Number(detail?.coordinates?.xCoordinate ?? 126.908);
-                const lat = Number(detail?.coordinates?.yCoordinate ?? 37.556);
-                const zoom = 19;
-                const n = Math.pow(2, zoom);
-                const tileX = Math.floor((lng + 180) / 360 * n);
-                const latRad = lat * Math.PI / 180;
-                const tileY = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n);
-                const layer = compressToEncodedURIComponent(JSON.stringify([
-                  { id: "article_list", searchParams: { type: "CLUSTER", clusterId: `${zoom}/${tileX}/${tileY}` } },
-                  { id: "article_detail", params: { articleId: property.id }, searchParams: {} }
-                ]));
-                return `https://fin.land.naver.com/map?center=${lng}-${lat}&zoom=16&tradeTypes=A1-B1-B2-B3&realEstateTypes=D02-D03-D04-E01-Z00&layer=${layer}`;
-              })()}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded-md hover:bg-accent"
-              title="네이버에서 보기"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />네이버
-            </a>
-            <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
-              <X className="h-5 w-5" />
-            </button>
-          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        {/* Price + Yield */}
-        <div className="bg-secondary rounded-lg p-4">
-          <div className="flex items-end justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">가격</p>
-              <p className="text-3xl font-bold">{formatPrice(property)}</p>
+        {/* Price + Yield + 네이버 링크 */}
+        <div className="bg-secondary rounded-lg px-4 py-3">
+          <div className="flex items-center justify-between">
+            <p className="text-lg font-bold">{formatPrice(property)}</p>
+            <div className="flex items-center gap-2">
+              {yieldRate && (
+                <p className="text-sm font-bold text-green-600 flex items-center gap-1">
+                  {yieldRate.toFixed(1)}%
+                  <span className="relative group/tip">
+                    <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-muted text-[10px] text-muted-foreground cursor-help">?</span>
+                    <span className="absolute bottom-6 right-0 hidden group-hover/tip:block w-[200px] bg-foreground text-background text-[11px] rounded-lg p-2.5 leading-relaxed shadow-lg z-50">
+                      연 수익률 = (월세 × 12) / 보증금 × 100<br /><br />
+                      월세 매물에만 표시됩니다. 권리금, 인테리어 비용 등은 미포함된 단순 수익률입니다.
+                    </span>
+                  </span>
+                </p>
+              )}
+              <a
+                href={(() => {
+                  const lng = Number(detail?.coordinates?.xCoordinate ?? 126.908);
+                  const lat = Number(detail?.coordinates?.yCoordinate ?? 37.556);
+                  const zoom = 19;
+                  const n = Math.pow(2, zoom);
+                  const tileX = Math.floor((lng + 180) / 360 * n);
+                  const latRad = lat * Math.PI / 180;
+                  const tileY = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n);
+                  const layer = compressToEncodedURIComponent(JSON.stringify([
+                    { id: "article_list", searchParams: { type: "CLUSTER", clusterId: `${zoom}/${tileX}/${tileY}` } },
+                    { id: "article_detail", params: { articleId: property.id }, searchParams: {} }
+                  ]));
+                  return `https://fin.land.naver.com/map?center=${lng}-${lat}&zoom=16&tradeTypes=A1-B1-B2-B3&realEstateTypes=D02-D03-D04-E01-Z00&layer=${layer}`;
+                })()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center h-6 px-2 rounded text-[11px] font-bold text-white bg-[#03C75A] hover:bg-[#02b351] transition-colors"
+                title="네이버에서 보기"
+              >
+                N
+              </a>
             </div>
-            {yieldRate && (
-              <div className="text-right">
-                <p className="text-sm text-muted-foreground mb-1">연 수익률</p>
-                <p className="text-2xl font-bold text-green-600">{yieldRate.toFixed(1)}%</p>
-              </div>
-            )}
           </div>
           {property.premiumKey && (
-            <p className="text-sm text-muted-foreground mt-2">권리금: {formatMoney(property.premiumKey)}</p>
+            <p className="text-xs text-muted-foreground mt-1">권리금: {formatMoney(property.premiumKey)}</p>
           )}
         </div>
 
@@ -202,158 +212,143 @@ function DetailPanel({ property, onClose }: { property: Property; onClose: () =>
 
         {/* Tab: 기본 */}
         {tab === "info" && (
-          <div className="space-y-5">
-            {/* 기본 정보 그리드 */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">면적</p>
-                <p className="text-sm font-medium flex items-center gap-1.5">
-                  <Ruler className="h-3.5 w-3.5 text-muted-foreground" />
-                  {property.areaLabel}{detail?.pyeongArea ? ` (${detail.pyeongArea}평)` : ""}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">욕실</p>
-                <p className="text-sm font-medium flex items-center gap-1.5">
-                  <Bath className="h-3.5 w-3.5 text-muted-foreground" />
-                  {detail ? `${detail.bathRoomCount ?? "—"}개` : detailLoading ? "..." : `${property.bathrooms}개`}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">층</p>
-                <p className="text-sm font-medium flex items-center gap-1.5"><Building className="h-3.5 w-3.5 text-muted-foreground" />{property.floor ? `${property.floor}/${property.totalFloors}층` : "—"}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">등록일</p>
-                <p className="text-sm font-medium">{property.createdAt}</p>
-              </div>
+          <div className="space-y-4">
+            {/* 1. 핵심 스펙 한줄 태그 */}
+            <div className="flex flex-wrap gap-1.5">
+              <Badge variant="secondary" className="text-xs">{property.areaLabel}{detail?.pyeongArea ? ` (${detail.pyeongArea}평)` : ""}</Badge>
+              {property.floor && <Badge variant="secondary" className="text-xs">{property.floor}/{property.totalFloors}층</Badge>}
+              {detail?.isParkingPossible != null && (
+                <Badge variant="secondary" className="text-xs">
+                  주차 {detail.isParkingPossible ? "가능" : "불가"}{detail.totalParkingCount != null ? ` ${detail.totalParkingCount}대` : ""}
+                </Badge>
+              )}
+              {detail && <Badge variant="secondary" className="text-xs">{formatMovingIn(detail)}</Badge>}
+              {detail?.bathRoomCount != null && <Badge variant="secondary" className="text-xs">욕실 {detail.bathRoomCount}개</Badge>}
+              {detail?.currentBusinessType && <Badge variant="secondary" className="text-xs">현 {detail.currentBusinessType}</Badge>}
+              {detail?.isIllegalBuilding && <Badge variant="destructive" className="text-xs">위반건축물</Badge>}
+              {detailLoading && <Badge variant="secondary" className="text-xs"><Loader2 className="h-3 w-3 animate-spin" /></Badge>}
             </div>
 
-            {/* 주소 */}
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">주소</p>
-              <p className="text-sm font-medium flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />{property.address}</p>
-            </div>
-
-            {/* 지도 placeholder */}
-            <div className="rounded-lg bg-secondary border border-border h-[140px] flex items-center justify-center">
-              <div className="text-center">
-                <MapPin className="h-6 w-6 text-muted-foreground/40 mx-auto mb-2" />
-                <p className="text-xs text-muted-foreground">지도 연동 예정</p>
-              </div>
-            </div>
-
-            {/* 설명 */}
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">설명</p>
-              <p className="text-sm leading-relaxed">{property.description}</p>
-            </div>
-
-            {/* 네이버 상세 정보 */}
-            {detailLoading && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-                <Loader2 className="h-4 w-4 animate-spin" />상세 정보 불러오는 중...
+            {/* 2. 지도 + 주소 */}
+            {detail?.coordinates ? (
+              <NaverMap
+                lat={detail.coordinates.yCoordinate}
+                lng={detail.coordinates.xCoordinate}
+                className="rounded-lg border border-border h-[160px]"
+              />
+            ) : (
+              <div className="rounded-lg bg-secondary border border-border h-[160px] flex items-center justify-center">
+                <div className="text-center">
+                  <MapPin className="h-6 w-6 text-muted-foreground/40 mx-auto mb-2" />
+                  <p className="text-xs text-muted-foreground">{detailLoading ? "지도 로딩 중..." : "위치 정보 없음"}</p>
+                </div>
               </div>
             )}
+            <p className="text-sm flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />{property.address}</p>
+
+            {/* 3. 건물 정보 */}
             {detail && (
               <>
-                {/* 건물 정보 */}
                 <Separator />
-                <div className="space-y-3">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">건물 정보</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    {detail.buildingUse && (
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">건축물용도</p>
-                        <p className="text-sm font-medium">{detail.buildingUse}</p>
-                      </div>
-                    )}
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">사용승인일</p>
-                      <p className="text-sm font-medium">
-                        {formatApprovalDate(detail.buildingConjunctionDate)}
-                        {detail.approvalElapsedYear ? ` (${detail.approvalElapsedYear}년)` : ""}
-                      </p>
+                <div className="grid grid-cols-2 gap-3">
+                  {detail.buildingUse && (
+                    <div className="space-y-0.5">
+                      <p className="text-[11px] text-muted-foreground">용도</p>
+                      <p className="text-sm font-medium">{detail.buildingUse}</p>
                     </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">난방</p>
-                      <p className="text-sm font-medium flex items-center gap-1.5">
-                        <Flame className="h-3.5 w-3.5 text-muted-foreground" />
-                        {formatHeating(detail.heatingAndCoolingSystemType)} / {formatHeatingEnergy(detail.heatingEnergyType)}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">주차</p>
-                      <p className="text-sm font-medium flex items-center gap-1.5">
-                        <Car className="h-3.5 w-3.5 text-muted-foreground" />
-                        {detail.isParkingPossible ? "가능" : "불가"}{detail.totalParkingCount != null ? ` (총 ${detail.totalParkingCount}대)` : ""}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">입주</p>
-                      <p className="text-sm font-medium flex items-center gap-1.5">
-                        <CalendarCheck className="h-3.5 w-3.5 text-muted-foreground" />
-                        {formatMovingIn(detail)}
-                      </p>
-                    </div>
-                    {detail.currentBusinessType && (
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">현재 업종</p>
-                        <p className="text-sm font-medium">{detail.currentBusinessType}</p>
-                      </div>
-                    )}
-                  </div>
-                  {detail.isIllegalBuilding && (
-                    <Badge variant="destructive" className="text-xs">위반건축물</Badge>
                   )}
-                </div>
-
-                {/* 중개사 정보 */}
-                <Separator />
-                <div className="space-y-3">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">중개사 정보</p>
-                  <div className="space-y-2">
-                    {detail.brokerageName && (
-                      <p className="text-sm font-medium">{detail.brokerageName}</p>
-                    )}
-                    {detail.brokerName && (
-                      <p className="text-xs text-muted-foreground">담당: {detail.brokerName}</p>
-                    )}
-                    {detail.phoneBrokerage && (
-                      <p className="text-sm flex items-center gap-1.5">
-                        <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                        <a href={`tel:${detail.phoneBrokerage}`} className="text-primary hover:underline">{detail.phoneBrokerage}</a>
-                      </p>
-                    )}
-                    {detail.phoneMobile && (
-                      <p className="text-sm flex items-center gap-1.5">
-                        <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                        <a href={`tel:${detail.phoneMobile}`} className="text-primary hover:underline">{detail.phoneMobile}</a>
-                      </p>
-                    )}
-                    {detail.agentAddress && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                        <MapPin className="h-3 w-3 shrink-0" />{detail.agentAddress}
-                      </p>
-                    )}
-                    {detail.businessRegistrationNumber && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                        <KeyRound className="h-3 w-3 shrink-0" />등록번호: {detail.businessRegistrationNumber}
-                      </p>
-                    )}
+                  <div className="space-y-0.5">
+                    <p className="text-[11px] text-muted-foreground">사용승인</p>
+                    <p className="text-sm font-medium">
+                      {formatApprovalDate(detail.buildingConjunctionDate)}
+                      {detail.approvalElapsedYear ? ` (${detail.approvalElapsedYear}년)` : ""}
+                    </p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-[11px] text-muted-foreground">난방</p>
+                    <p className="text-sm font-medium">{formatHeating(detail.heatingAndCoolingSystemType)} / {formatHeatingEnergy(detail.heatingEnergyType)}</p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-[11px] text-muted-foreground">등록일</p>
+                    <p className="text-sm font-medium">{property.createdAt}</p>
                   </div>
                 </div>
               </>
             )}
 
-            {property.features.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground">특징</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {property.features.map((f) => (<Badge key={f} variant="secondary" className="text-xs">{f}</Badge>))}
+            {/* 4. 중개사 — 전화 버튼 강조 */}
+            {detail && (detail.brokerageName || detail.phoneBrokerage) && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      {detail.brokerageName && <p className="text-sm font-medium">{detail.brokerageName}</p>}
+                      {detail.brokerName && <p className="text-xs text-muted-foreground">담당: {detail.brokerName}</p>}
+                    </div>
+                    {detail.businessRegistrationNumber && (
+                      <p className="text-[11px] text-muted-foreground">{detail.businessRegistrationNumber}</p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    {detail.phoneBrokerage && (
+                      <a href={`tel:${detail.phoneBrokerage}`} className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium py-2 hover:bg-primary/90 transition-colors">
+                        <Phone className="h-3.5 w-3.5" />{detail.phoneBrokerage}
+                      </a>
+                    )}
+                    {detail.phoneMobile && (
+                      <a href={`tel:${detail.phoneMobile}`} className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md border text-sm font-medium py-2 hover:bg-accent transition-colors">
+                        <Phone className="h-3.5 w-3.5" />{detail.phoneMobile}
+                      </a>
+                    )}
+                  </div>
+                  {detail.agentAddress && (
+                    <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                      <MapPin className="h-3 w-3 shrink-0" />{detail.agentAddress}
+                    </p>
+                  )}
                 </div>
+              </>
+            )}
+
+            {/* 5. 설명 */}
+            {(detail?.articleDescription || property.description) && (
+              <>
+                <Separator />
+                <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-line">
+                  {detail?.articleDescription || property.description}
+                </p>
+              </>
+            )}
+
+            {property.features.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {property.features.map((f) => (<Badge key={f} variant="outline" className="text-xs">{f}</Badge>))}
               </div>
             )}
+
+            {/* 6. 개인 메모 */}
+            <Separator />
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground flex items-center gap-1"><StickyNote className="h-3 w-3" />메모</p>
+                {memoChanged && (
+                  <Button
+                    size="sm"
+                    className="h-6 text-xs px-2"
+                    onClick={() => { saveMemo(property.id, memoValue); onMemoSaved?.(property.id, memoValue); }}
+                  >
+                    저장
+                  </Button>
+                )}
+              </div>
+              <textarea
+                placeholder="이 매물에 대한 메모를 남겨보세요..."
+                value={memoValue}
+                onChange={(e) => setMemoValue(e.target.value)}
+                className={`w-full text-sm bg-secondary/50 border rounded-md p-2.5 resize-none h-[80px] focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground ${memoChanged ? "border-primary" : ""}`}
+              />
+            </div>
           </div>
         )}
 
@@ -504,7 +499,7 @@ function CompareView({ properties, onClose }: { properties: Property[]; onClose:
   const toggleCompare = useStore((s) => s.toggleCompare);
 
   return (
-    <div className="bg-card rounded-lg border overflow-auto">
+    <div className="bg-card rounded-lg border overflow-visible">
       <div className="flex items-center justify-between p-4 border-b">
         <div className="flex items-center gap-2">
           <Scale className="h-4 w-4" />
@@ -540,7 +535,19 @@ function CompareView({ properties, onClose }: { properties: Property[]; onClose:
           </tr>
           {labels.map((label) => (
             <tr key={label} className="border-b last:border-b-0">
-              <td className="p-3 font-medium text-muted-foreground bg-secondary whitespace-nowrap">{label}</td>
+              <td className="p-3 font-medium text-muted-foreground bg-secondary whitespace-nowrap">
+                {label === "수익률" ? (
+                  <span className="flex items-center gap-1">
+                    {label}
+                    <span className="relative group/tip">
+                      <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-muted text-[10px] text-muted-foreground cursor-help">?</span>
+                      <span className="fixed hidden group-hover/tip:block w-[220px] bg-foreground text-background text-[11px] rounded-lg p-2.5 leading-relaxed shadow-lg z-[100]" style={{ transform: "translate(-50%, -110%)" }}>
+                        연 수익률 = (월세 × 12) / 보증금 × 100<br /><br />권리금, 인테리어 비용 등은 미포함된 단순 수익률입니다.
+                      </span>
+                    </span>
+                  </span>
+                ) : label}
+              </td>
               {Array.from({ length: 5 }).map((_, i) => {
                 const p = properties[i];
                 if (!p) return <td key={i} className="p-3 border-l" />;
@@ -593,68 +600,204 @@ export default function Properties() {
   const clearCompare = useStore((s) => s.clearCompare);
   const [showCompare, setShowCompare] = useState(false);
   const [showBulkCollection, setShowBulkCollection] = useState(false);
+  const [showDongFilter, setShowDongFilter] = useState(false);
+  const [showPriceFilter, setShowPriceFilter] = useState(false);
+  const [priceMinInput, setPriceMinInput] = useState("");
+  const [priceMaxInput, setPriceMaxInput] = useState("");
+  const [rentMinInput, setRentMinInput] = useState("");
+  const [rentMaxInput, setRentMaxInput] = useState("");
+  const [settingsApplied, setSettingsApplied] = useState(false);
 
   useEffect(() => {
+    // zustand persist hydration 대기 후 설정 적용
+    const unsub = useSettingsStore.persist.onFinishHydration(() => {
+      const s = useSettingsStore.getState();
+      const initFilters: Record<string, unknown> = {};
+      if (s.defaultDong !== "전체") initFilters.dong = [s.defaultDong];
+      if (s.defaultPropertyType !== "전체") initFilters.propertyType = s.defaultPropertyType;
+      if (s.defaultDealType !== "전체") initFilters.dealType = s.defaultDealType;
+      if (Object.keys(initFilters).length > 0) setFilters(initFilters);
+      setSettingsApplied(true);
+    });
+    // 이미 hydrate 됐을 수 있음
+    if (useSettingsStore.persist.hasHydrated()) {
+      const s = useSettingsStore.getState();
+      const initFilters: Record<string, unknown> = {};
+      if (s.defaultDong !== "전체") initFilters.dong = [s.defaultDong];
+      if (s.defaultPropertyType !== "전체") initFilters.propertyType = s.defaultPropertyType;
+      if (s.defaultDealType !== "전체") initFilters.dealType = s.defaultDealType;
+      if (Object.keys(initFilters).length > 0) setFilters(initFilters);
+      setSettingsApplied(true);
+    }
     loadProperties();
     loadDongList();
-  }, [loadProperties, loadDongList]);
+    return unsub;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const selectedProperty = selectedId ? properties.find((p) => p.id === selectedId) : null;
   const compareProperties = compareIds.map((id) => properties.find((p) => p.id === id)).filter(Boolean) as Property[];
 
   return (
-    <div className="space-y-6">
+    <div>
       {showCompare && compareProperties.length >= 2 && (
-        <CompareView properties={compareProperties} onClose={() => setShowCompare(false)} />
+        <div className="mb-4">
+          <CompareView properties={compareProperties} onClose={() => setShowCompare(false)} />
+        </div>
       )}
 
-      <div className="flex gap-6 h-[calc(100vh-5rem)]">
+      <div className="flex gap-6 h-[calc(100vh-3.5rem)]">
         {/* Left: table */}
-        <div className="flex-1 min-w-0 max-w-3xl flex flex-col space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold">매물 목록</h1>
-            <p className="text-muted-foreground text-sm mt-1">
-              {loading ? "로딩 중..." : `총 ${totalCount.toLocaleString()}건`}
-            </p>
-          </div>
+        <div className="flex-1 min-w-0 max-w-3xl flex flex-col">
+          <h1 className="text-3xl font-bold mb-3">매물 목록</h1>
 
           {/* Filters */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap mb-2">
             <div className="relative flex-1 min-w-[180px]">
-              {loading ? (
-                <Loader2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground animate-spin" />
-              ) : (
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              )}
-              <Input placeholder="매물명, 주소 검색..." value={filters.search} onChange={(e) => setFilters({ search: e.target.value })} className={`pl-9 h-9 bg-card text-sm ${filters.search ? "border-2 border-primary" : ""}`} />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input placeholder="매물명, 주소 검색..." value={filters.search} onChange={(e) => setFilters({ search: e.target.value })} className={`pl-9 h-9 bg-card text-sm border-2 ${filters.search ? "border-primary" : "border-transparent"}`} />
             </div>
-            <Select value={filters.dong} onValueChange={(v) => setFilters({ dong: v })}>
-              <SelectTrigger className={`w-[110px] h-9 bg-card text-sm ${filters.dong !== "전체" ? "border-2 border-primary" : ""}`}><span>{filters.dong === "전체" ? "전체 동" : filters.dong}</span></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="전체">전체 동</SelectItem>
-                {dongList.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <div className="relative">
+              <button
+                onClick={() => setShowDongFilter(!showDongFilter)}
+                className={`h-9 px-3 rounded-md border-2 bg-card text-sm flex items-center gap-1 transition-colors ${filters.dong.length > 0 ? "border-primary" : "border-transparent hover:bg-accent"}`}
+              >
+                {filters.dong.length === 0 ? "전체 동" : filters.dong.length === 1 ? filters.dong[0] : `${filters.dong[0]} 외 ${filters.dong.length - 1}`}
+              </button>
+              {showDongFilter && (
+                <>
+                  <div className="fixed inset-0 z-20" onClick={() => setShowDongFilter(false)} />
+                  <div className="absolute top-10 left-0 z-30 bg-card border rounded-lg shadow-lg p-3 w-[200px] max-h-[300px] overflow-y-auto space-y-1">
+                    <button
+                      className={`w-full text-left text-xs px-2 py-1.5 rounded transition-colors ${filters.dong.length === 0 ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`}
+                      onClick={() => { setFilters({ dong: [] }); setShowDongFilter(false); }}
+                    >
+                      전체 동
+                    </button>
+                    {dongList.map((d) => {
+                      const selected = filters.dong.includes(d);
+                      return (
+                        <button
+                          key={d}
+                          className={`w-full text-left text-xs px-2 py-1.5 rounded transition-colors flex items-center gap-2 ${selected ? "bg-primary/10 font-medium" : "hover:bg-accent"}`}
+                          onClick={() => {
+                            const next = selected ? filters.dong.filter((x) => x !== d) : [...filters.dong, d];
+                            setFilters({ dong: next });
+                          }}
+                        >
+                          <span className={`h-3.5 w-3.5 rounded border flex items-center justify-center ${selected ? "bg-primary border-primary text-primary-foreground" : "border-border"}`}>
+                            {selected && <span className="text-[10px]">✓</span>}
+                          </span>
+                          {d}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
             <Select value={filters.propertyType} onValueChange={(v) => setFilters({ propertyType: v as PropertyType | "전체" })}>
-              <SelectTrigger className={`w-[110px] h-9 bg-card text-sm ${filters.propertyType !== "전체" ? "border-2 border-primary" : ""}`}><span>{filters.propertyType === "전체" ? "전체 유형" : filters.propertyType}</span></SelectTrigger>
+              <SelectTrigger className={`w-[110px] h-9 bg-card text-sm border-2 ${filters.propertyType !== "전체" ? "border-primary" : "border-transparent"}`}><span>{filters.propertyType === "전체" ? "전체 유형" : filters.propertyType}</span></SelectTrigger>
               <SelectContent>{propertyTypes.map((t) => <SelectItem key={t} value={t}>{t === "전체" ? "전체 유형" : t}</SelectItem>)}</SelectContent>
             </Select>
             <Select value={filters.dealType} onValueChange={(v) => setFilters({ dealType: v as DealType | "전체" })}>
-              <SelectTrigger className={`w-[100px] h-9 bg-card text-sm ${filters.dealType !== "전체" ? "border-2 border-primary" : ""}`}><span>{filters.dealType === "전체" ? "전체 거래" : filters.dealType}</span></SelectTrigger>
+              <SelectTrigger className={`w-[100px] h-9 bg-card text-sm border-2 ${filters.dealType !== "전체" ? "border-primary" : "border-transparent"}`}><span>{filters.dealType === "전체" ? "전체 거래" : filters.dealType}</span></SelectTrigger>
               <SelectContent>{dealTypes.map((t) => <SelectItem key={t} value={t}>{t === "전체" ? "전체 거래" : t}</SelectItem>)}</SelectContent>
             </Select>
             <Select value={filters.floorFilter} onValueChange={(v) => setFilters({ floorFilter: v as typeof filters.floorFilter })}>
-              <SelectTrigger className={`w-[100px] h-9 bg-card text-sm ${filters.floorFilter !== "전체" ? "border-2 border-primary" : ""}`}><span>{filters.floorFilter === "전체" ? "전체 층" : filters.floorFilter}</span></SelectTrigger>
+              <SelectTrigger className={`w-[100px] h-9 bg-card text-sm border-2 ${filters.floorFilter !== "전체" ? "border-primary" : "border-transparent"}`}><span>{filters.floorFilter === "전체" ? "전체 층" : filters.floorFilter}</span></SelectTrigger>
               <SelectContent>{floorOptions.map((t) => <SelectItem key={t} value={t}>{t === "전체" ? "전체 층" : t}</SelectItem>)}</SelectContent>
             </Select>
+            <div className="relative">
+              <button
+                onClick={() => setShowPriceFilter(!showPriceFilter)}
+                className={`h-9 px-3 rounded-md border-2 bg-card text-sm flex items-center gap-1 transition-colors ${filters.priceMin > 0 || filters.priceMax > 0 || filters.rentMin > 0 || filters.rentMax > 0 ? "border-primary" : "border-transparent hover:bg-accent"}`}
+              >
+                {filters.priceMin > 0 || filters.priceMax > 0 || filters.rentMin > 0 || filters.rentMax > 0 ? "가격 적용중" : "가격"}
+              </button>
+              {showPriceFilter && (
+                <>
+                <div className="fixed inset-0 z-20" onClick={() => setShowPriceFilter(false)} />
+                <div className="absolute top-10 left-0 z-30 bg-card border rounded-lg shadow-lg p-4 w-[280px] space-y-4">
+                  {/* 보증금/매매가 */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium">보증금 / 매매가 / 전세금</p>
+                    <div className="flex items-center gap-2">
+                      <Input type="number" placeholder="최소 (만)" value={priceMinInput} onChange={(e) => setPriceMinInput(e.target.value)} className="h-8 text-sm" />
+                      <span className="text-muted-foreground text-sm">~</span>
+                      <Input type="number" placeholder="최대 (만)" value={priceMaxInput} onChange={(e) => setPriceMaxInput(e.target.value)} className="h-8 text-sm" />
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { label: "5천 이하", min: 0, max: 5000 },
+                        { label: "1억 이하", min: 0, max: 10000 },
+                        { label: "1~5억", min: 10000, max: 50000 },
+                        { label: "5~10억", min: 50000, max: 100000 },
+                        { label: "10억+", min: 100000, max: 0 },
+                      ].map((p) => (
+                        <button key={p.label} className="text-[11px] border rounded px-2 py-0.5 hover:bg-accent transition-colors"
+                          onClick={() => { setPriceMinInput(p.min > 0 ? String(p.min) : ""); setPriceMaxInput(p.max > 0 ? String(p.max) : ""); }}>
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* 월세 */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium">월세</p>
+                    <div className="flex items-center gap-2">
+                      <Input type="number" placeholder="최소 (만)" value={rentMinInput} onChange={(e) => setRentMinInput(e.target.value)} className="h-8 text-sm" />
+                      <span className="text-muted-foreground text-sm">~</span>
+                      <Input type="number" placeholder="최대 (만)" value={rentMaxInput} onChange={(e) => setRentMaxInput(e.target.value)} className="h-8 text-sm" />
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { label: "50만 이하", min: 0, max: 50 },
+                        { label: "50~100만", min: 50, max: 100 },
+                        { label: "100~200만", min: 100, max: 200 },
+                        { label: "200~500만", min: 200, max: 500 },
+                        { label: "500만+", min: 500, max: 0 },
+                      ].map((p) => (
+                        <button key={p.label} className="text-[11px] border rounded px-2 py-0.5 hover:bg-accent transition-colors"
+                          onClick={() => { setRentMinInput(p.min > 0 ? String(p.min) : ""); setRentMaxInput(p.max > 0 ? String(p.max) : ""); }}>
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" variant="outline" className="flex-1 h-8 text-xs" onClick={() => {
+                      setPriceMinInput(""); setPriceMaxInput(""); setRentMinInput(""); setRentMaxInput("");
+                      setFilters({ priceMin: 0, priceMax: 0, rentMin: 0, rentMax: 0 });
+                      setShowPriceFilter(false);
+                    }}>초기화</Button>
+                    <Button size="sm" className="flex-1 h-8 text-xs" onClick={() => {
+                      setFilters({
+                        priceMin: Number(priceMinInput) || 0,
+                        priceMax: Number(priceMaxInput) || 0,
+                        rentMin: Number(rentMinInput) || 0,
+                        rentMax: Number(rentMaxInput) || 0,
+                      });
+                      setShowPriceFilter(false);
+                    }}>적용</Button>
+                  </div>
+                </div>
+                </>
+              )}
+            </div>
             <Select value={filters.sortBy} onValueChange={(v) => setFilters({ sortBy: v as typeof filters.sortBy })}>
-              <SelectTrigger className={`w-[110px] h-9 bg-card text-sm ${filters.sortBy !== "default" ? "border-2 border-primary" : ""}`}><span>{sortOptions.find((o) => o.value === filters.sortBy)?.label ?? "정렬"}</span></SelectTrigger>
+              <SelectTrigger className={`w-[110px] h-9 bg-card text-sm border-2 ${filters.sortBy !== "default" ? "border-primary" : "border-transparent"}`}><span>{sortOptions.find((o) => o.value === filters.sortBy)?.label ?? "정렬"}</span></SelectTrigger>
               <SelectContent>{sortOptions.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
             </Select>
             <Button variant="ghost" size="sm" className="h-9 text-sm text-muted-foreground" onClick={resetFilters}>
               <RotateCcw className="h-3.5 w-3.5 mr-1" />초기화
             </Button>
+            <span className="text-xs text-muted-foreground ml-auto">{loading ? "로딩 중..." : `${totalCount.toLocaleString()}건 · ${pageSize}개씩`}</span>
           </div>
 
           {/* Table */}
@@ -699,8 +842,15 @@ export default function Properties() {
                       <TableCell className="font-medium text-sm max-w-[180px] truncate">{p.title}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{p.address.replace("서울시 마포구 ", "")}</TableCell>
                       <TableCell className="text-sm">{p.dealType}</TableCell>
-                      <TableCell className="text-sm font-semibold text-right tabular-nums">{formatPrice(p)}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground text-right tabular-nums">{p.area}m²</TableCell>
+                      <TableCell className="text-sm font-semibold text-right tabular-nums">
+                        <span className="flex items-center justify-end gap-1">
+                          {p.priceChange === "increase" && <span className="text-red-500 text-[10px]">▲</span>}
+                          {p.priceChange === "decrease" && <span className="text-blue-500 text-[10px]">▼</span>}
+                          {p.priceChange === "new" && <span className="text-green-500 text-[10px]">N</span>}
+                          {formatPrice(p)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground text-right tabular-nums">{p.areaLabel}</TableCell>
                       <TableCell className="text-sm text-muted-foreground text-center">{p.floor ?? "—"}</TableCell>
                     </TableRow>
                   ))}
@@ -709,18 +859,13 @@ export default function Properties() {
             </div>
           )}
 
-          {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                {page} / {totalPages} 페이지 (건당 {pageSize}건)
-              </p>
-              <div className="flex gap-1">
-                <Button variant="outline" size="sm" className="h-8" onClick={() => setPage(1)} disabled={page === 1}>처음</Button>
-                <Button variant="outline" size="sm" className="h-8" onClick={() => setPage(page - 1)} disabled={page === 1}>이전</Button>
-                <Button variant="outline" size="sm" className="h-8" onClick={() => setPage(page + 1)} disabled={page === totalPages}>다음</Button>
-                <Button variant="outline" size="sm" className="h-8" onClick={() => setPage(totalPages)} disabled={page === totalPages}>끝</Button>
-              </div>
+            <div className="flex items-center gap-0.5 mt-2">
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-base" onClick={() => setPage(1)} disabled={page === 1}>&laquo;</Button>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-base" onClick={() => setPage(page - 1)} disabled={page === 1}>&lsaquo;</Button>
+              <span className="text-sm tabular-nums font-medium px-2">{page}/{totalPages}</span>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-base" onClick={() => setPage(page + 1)} disabled={page === totalPages}>&rsaquo;</Button>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-base" onClick={() => setPage(totalPages)} disabled={page === totalPages}>&raquo;</Button>
             </div>
           )}
         </div>
@@ -741,42 +886,26 @@ export default function Properties() {
         </div>
       </div>
 
-      {/* Bottom floating action bar */}
+      {/* Bottom floating action bar — 왼쪽 */}
       {compareIds.length > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 bg-card border rounded-xl shadow-lg px-5 py-3 flex items-center gap-4 animate-in slide-in-from-bottom-4 duration-200">
           <span className="text-sm font-medium">{compareIds.length}개 선택</span>
           <Separator orientation="vertical" className="h-5" />
           <div className="relative">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-8 text-xs gap-1.5"
-              onClick={() => setShowBulkCollection(!showBulkCollection)}
-            >
-              <Bookmark className="h-3.5 w-3.5" />
-              컬렉션에 저장
+            <Button size="sm" variant="ghost" className="h-8 text-xs gap-1.5" onClick={() => setShowBulkCollection(!showBulkCollection)}>
+              <Bookmark className="h-3.5 w-3.5" />컬렉션에 저장
             </Button>
             {showBulkCollection && (
-              <div className="absolute bottom-10 left-0">
+              <div className="absolute bottom-12 left-0">
                 <CollectionPopup
                   propertyIds={compareIds}
-                  onClose={() => {
-                    setShowBulkCollection(false);
-                    clearCompare();
-                  }}
+                  onClose={() => { setShowBulkCollection(false); clearCompare(); }}
                 />
               </div>
             )}
           </div>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-8 text-xs gap-1.5"
-            onClick={() => setShowCompare(true)}
-            disabled={compareIds.length < 2}
-          >
-            <Scale className="h-3.5 w-3.5" />
-            비교하기
+          <Button size="sm" variant="ghost" className="h-8 text-xs gap-1.5" onClick={() => setShowCompare(true)} disabled={compareIds.length < 2}>
+            <Scale className="h-3.5 w-3.5" />비교하기
           </Button>
           <Separator orientation="vertical" className="h-5" />
           <Button size="sm" variant="ghost" className="h-8 text-xs text-muted-foreground" onClick={clearCompare}>

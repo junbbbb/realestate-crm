@@ -47,7 +47,7 @@ def region_bbox(region, pad=0.015):
 def make_filter(cortar_no):
     return {
         "tradeTypes": ["B1", "B2", "A1", "B3"],
-        "realEstateTypes": ["D03", "D04", "E01", "Z00", "D02"],
+        "realEstateTypes": ["D01", "D02", "D03", "D04", "D05", "E01", "Z00"],
         "roomCount": [],
         "bathRoomCount": [],
         "optionTypes": [],

@@ -1,14 +1,18 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useCollectionStore } from "@/lib/collection-store";
 import {
   LayoutDashboard,
   Building2,
   Bookmark,
   FolderOpen,
   Users,
+  Settings,
 } from "lucide-react";
+import { Toaster } from "@/components/toast";
 import {
   Tooltip,
   TooltipContent,
@@ -22,10 +26,16 @@ const nav = [
   { label: "저장한 매물", href: "/favorites", icon: Bookmark },
   { label: "내 매물", href: "/my-listings", icon: FolderOpen },
   { label: "고객", href: "/customers", icon: Users },
+  { label: "설정", href: "/settings", icon: Settings },
 ];
 
 export default function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
+  const loadCollections = useCollectionStore((s) => s.loadCollections);
+
+  useEffect(() => {
+    loadCollections();
+  }, [loadCollections]);
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -68,9 +78,10 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         </aside>
 
         {/* Content */}
-        <main className="flex-1 pt-6 pb-4 px-8 overflow-auto">
+        <main className="flex-1 py-4 px-6 overflow-auto">
           <div>{children}</div>
         </main>
+        <Toaster />
       </div>
     </TooltipProvider>
   );
