@@ -17,8 +17,9 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
   Heart, Search, RotateCcw, Inbox, X, MapPin, Ruler, BedDouble, Building, Phone,
-  TrendingUp, Store, Users, FileText, BarChart3, Scale, Calculator, Plus,
+  TrendingUp, Store, Users, FileText, BarChart3, Scale, Calculator, Plus, Bookmark,
 } from "lucide-react";
+import { BookmarkButton, CollectionPopup } from "@/components/collection-popup";
 
 const propertyTypes: (PropertyType | "전체")[] = ["전체", "아파트", "오피스텔", "빌라", "상가", "토지", "원룸"];
 const dealTypes: (DealType | "전체")[] = ["전체", "매매", "전세", "월세"];
@@ -120,14 +121,9 @@ function DetailPanel({ property, onClose }: { property: Property; onClose: () =>
             </div>
             <h2 className="text-xl font-bold mt-2">{property.title}</h2>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => toggleFavorite(property.id)}>
-              <Heart className={`h-5 w-5 ${property.isFavorite ? "fill-red-500 text-red-500" : "text-muted-foreground hover:text-foreground"} transition-colors`} />
-            </button>
-            <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
-              <X className="h-5 w-5" />
-            </button>
-          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         {/* Price + Yield */}
@@ -451,6 +447,7 @@ export default function Properties() {
   const toggleCompare = useStore((s) => s.toggleCompare);
   const clearCompare = useStore((s) => s.clearCompare);
   const [showCompare, setShowCompare] = useState(false);
+  const [showBulkCollection, setShowBulkCollection] = useState(false);
 
   useEffect(() => {
     loadProperties();
@@ -463,21 +460,6 @@ export default function Properties() {
 
   return (
     <div className="space-y-6">
-      {/* Compare bar */}
-      {compareIds.length > 0 && (
-        <div className="bg-card border rounded-lg px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm">
-            <Scale className="h-4 w-4" />
-            <span className="font-medium">{compareIds.length}개 선택됨</span>
-            <span className="text-muted-foreground">(최대 5개)</span>
-          </div>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={clearCompare}>선택 해제</Button>
-            <Button size="sm" className="h-8 text-xs" onClick={() => setShowCompare(true)} disabled={compareIds.length < 2}>비교하기</Button>
-          </div>
-        </div>
-      )}
-
       {showCompare && compareProperties.length >= 2 && (
         <CompareView properties={compareProperties} onClose={() => setShowCompare(false)} />
       )}
@@ -499,22 +481,26 @@ export default function Properties() {
               <Input placeholder="매물명, 주소 검색..." value={filters.search} onChange={(e) => setFilters({ search: e.target.value })} className="pl-9 h-9 bg-card text-sm" />
             </div>
             <Select value={filters.dong} onValueChange={(v) => setFilters({ dong: v })}>
-              <SelectTrigger className="w-[110px] h-9 bg-card text-sm"><SelectValue placeholder="동" /></SelectTrigger>
+              <SelectTrigger className="w-[110px] h-9 bg-card text-sm"><span>{filters.dong === "전체" ? "전체 동" : filters.dong}</span></SelectTrigger>
               <SelectContent>
                 <SelectItem value="전체">전체 동</SelectItem>
                 {dongList.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={filters.propertyType} onValueChange={(v) => setFilters({ propertyType: v as PropertyType | "전체" })}>
-              <SelectTrigger className="w-[110px] h-9 bg-card text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>{propertyTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+              <SelectTrigger className="w-[110px] h-9 bg-card text-sm"><span>{filters.propertyType === "전체" ? "전체 유형" : filters.propertyType}</span></SelectTrigger>
+              <SelectContent>{propertyTypes.map((t) => <SelectItem key={t} value={t}>{t === "전체" ? "전체 유형" : t}</SelectItem>)}</SelectContent>
             </Select>
             <Select value={filters.dealType} onValueChange={(v) => setFilters({ dealType: v as DealType | "전체" })}>
-              <SelectTrigger className="w-[90px] h-9 bg-card text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>{dealTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+              <SelectTrigger className="w-[100px] h-9 bg-card text-sm"><span>{filters.dealType === "전체" ? "전체 거래" : filters.dealType}</span></SelectTrigger>
+              <SelectContent>{dealTypes.map((t) => <SelectItem key={t} value={t}>{t === "전체" ? "전체 거래" : t}</SelectItem>)}</SelectContent>
+            </Select>
+            <Select value={filters.floorFilter} onValueChange={(v) => setFilters({ floorFilter: v as typeof filters.floorFilter })}>
+              <SelectTrigger className="w-[100px] h-9 bg-card text-sm"><span>{filters.floorFilter === "전체" ? "전체 층" : filters.floorFilter}</span></SelectTrigger>
+              <SelectContent>{floorOptions.map((t) => <SelectItem key={t} value={t}>{t === "전체" ? "전체 층" : t}</SelectItem>)}</SelectContent>
             </Select>
             <Select value={filters.sortBy} onValueChange={(v) => setFilters({ sortBy: v as typeof filters.sortBy })}>
-              <SelectTrigger className="w-[110px] h-9 bg-card text-sm"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-[110px] h-9 bg-card text-sm"><span>{sortOptions.find((o) => o.value === filters.sortBy)?.label ?? "정렬"}</span></SelectTrigger>
               <SelectContent>{sortOptions.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
             </Select>
             <Button variant="ghost" size="sm" className="h-9 text-sm text-muted-foreground" onClick={resetFilters}>
@@ -554,9 +540,7 @@ export default function Properties() {
                         <input type="checkbox" checked={compareIds.includes(p.id)} onChange={() => toggleCompare(p.id)} className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer" />
                       </TableCell>
                       <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                        <button onClick={() => toggleFavorite(p.id)}>
-                          <Heart className={`h-3.5 w-3.5 ${p.isFavorite ? "fill-red-500 text-red-500" : "text-muted-foreground hover:text-foreground"} transition-colors`} />
-                        </button>
+                        <BookmarkButton propertyId={p.id} />
                       </TableCell>
                       <TableCell className="font-medium text-sm max-w-[180px] truncate">{p.title}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{p.address.replace("서울시 마포구 ", "")}</TableCell>
@@ -588,7 +572,7 @@ export default function Properties() {
         </div>
 
         {/* Right: detail panel */}
-        <div className="flex-1 min-w-[360px]">
+        <div className="w-[380px] shrink-0">
           {selectedProperty ? (
             <DetailPanel property={selectedProperty} onClose={() => selectProperty(null)} />
           ) : (
@@ -602,6 +586,50 @@ export default function Properties() {
           )}
         </div>
       </div>
+
+      {/* Bottom floating action bar */}
+      {compareIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 bg-card border rounded-xl shadow-lg px-5 py-3 flex items-center gap-4 animate-in slide-in-from-bottom-4 duration-200">
+          <span className="text-sm font-medium">{compareIds.length}개 선택</span>
+          <Separator orientation="vertical" className="h-5" />
+          <div className="relative">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 text-xs gap-1.5"
+              onClick={() => setShowBulkCollection(!showBulkCollection)}
+            >
+              <Bookmark className="h-3.5 w-3.5" />
+              컬렉션에 저장
+            </Button>
+            {showBulkCollection && (
+              <div className="absolute bottom-10 left-0">
+                <CollectionPopup
+                  propertyIds={compareIds}
+                  onClose={() => {
+                    setShowBulkCollection(false);
+                    clearCompare();
+                  }}
+                />
+              </div>
+            )}
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 text-xs gap-1.5"
+            onClick={() => setShowCompare(true)}
+            disabled={compareIds.length < 2}
+          >
+            <Scale className="h-3.5 w-3.5" />
+            비교하기
+          </Button>
+          <Separator orientation="vertical" className="h-5" />
+          <Button size="sm" variant="ghost" className="h-8 text-xs text-muted-foreground" onClick={clearCompare}>
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

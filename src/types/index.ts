@@ -52,6 +52,13 @@ export interface Customer {
   history?: { date: string; note: string }[]; // 추천 히스토리
 }
 
+export interface Collection {
+  id: string;
+  name: string;
+  propertyIds: string[];
+  createdAt: string;
+}
+
 export interface PropertyFilters {
   search: string;
   dong: string; // "전체" or 동 이름

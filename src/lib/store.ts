@@ -121,6 +121,24 @@ export const useStore = create<AppState>((set, get) => ({
         );
       }
 
+      // 층 필터
+      if (filters.floorFilter && filters.floorFilter !== "전체") {
+        if (filters.floorFilter === "1층") {
+          query = query.like("floor_info", "1/%");
+        } else if (filters.floorFilter === "지하") {
+          query = query.or("floor_info.like.B%,floor_info.like.-%");
+        } else if (filters.floorFilter === "2층 이상") {
+          // floor_info is like "3/5", "12/15" etc. We need floor >= 2.
+          // Since Supabase doesn't support computed filters easily,
+          // we exclude 1st floor and basement, and require floor_info to exist.
+          query = query
+            .not("floor_info", "like", "1/%")
+            .not("floor_info", "like", "B%")
+            .not("floor_info", "like", "-%")
+            .not("floor_info", "is", null);
+        }
+      }
+
       // 면적 필터
       if (filters.areaMin > 0) {
         query = query.gte("area2", filters.areaMin);

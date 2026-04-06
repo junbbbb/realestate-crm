@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Building2,
-  Heart,
+  Bookmark,
   FolderOpen,
   Users,
 } from "lucide-react";
@@ -19,7 +19,7 @@ import {
 const nav = [
   { label: "대시보드", href: "/", icon: LayoutDashboard },
   { label: "매물 목록", href: "/properties", icon: Building2 },
-  { label: "즐겨찾기", href: "/favorites", icon: Heart },
+  { label: "저장한 매물", href: "/favorites", icon: Bookmark },
   { label: "내 매물", href: "/my-listings", icon: FolderOpen },
   { label: "고객", href: "/customers", icon: Users },
 ];
