@@ -18,7 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Heart, Search, RotateCcw, Inbox, X, MapPin, Ruler, BedDouble, Building, Phone,
   TrendingUp, Store, Users, FileText, BarChart3, Scale, Calculator, Plus, Bookmark,
-  Car, Bath, Flame, CalendarCheck, Loader2, KeyRound, ExternalLink, StickyNote, Handshake,
+  Car, Bath, Flame, CalendarCheck, Loader2, KeyRound, ExternalLink, StickyNote, Handshake, Trash2,
 } from "lucide-react";
 import {
   fetchNaverDetail, NaverDetailInfo,
@@ -26,6 +26,10 @@ import {
 } from "@/lib/naver-detail";
 import { compressToEncodedURIComponent } from "lz-string";
 import { useDealStore } from "@/lib/deal-store";
+import { useToastStore } from "@/lib/toast-store";
+import { supabase } from "@/lib/supabase";
+import { useCustomerStore, Customer } from "@/lib/customer-store";
+import { useRouter } from "next/navigation";
 import { BookmarkButton, CollectionPopup } from "@/components/collection-popup";
 import NaverMap from "@/components/naver-map";
 import { useSettingsStore } from "@/lib/settings-store";
@@ -97,10 +101,80 @@ function CostSimulator({ property }: { property: Property }) {
 }
 
 /* ── Detail Panel ── */
+function StartDealModal({ property, sellers, buyers, onConfirm, onClose }: {
+  property: Property;
+  sellers: Customer[];
+  buyers: Customer[];
+  onConfirm: (sellerId: string | null, buyerId: string | null) => void;
+  onClose: () => void;
+}) {
+  const [sellerId, setSellerId] = useState<string | null>(null);
+  const [buyerId, setBuyerId] = useState<string | null>(null);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-card border rounded-lg shadow-lg w-[400px]">
+        <div className="p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold">거래 시작</h2>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+          </div>
+
+          <div className="bg-secondary rounded-lg p-3">
+            <p className="text-sm font-medium truncate">{property.title}</p>
+            <p className="text-xs text-muted-foreground">{property.dealType} · {property.address}</p>
+          </div>
+
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">임대인 / 매도인</p>
+              <Select value={sellerId || "_none"} onValueChange={(v) => setSellerId(v === "_none" ? null : v)}>
+                <SelectTrigger className="h-9 text-sm">
+                  <span>{sellerId ? sellers.find((c) => c.id === sellerId)?.name || "선택" : "미지정 (나중에 추가)"}</span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">미지정 (나중에 추가)</SelectItem>
+                  {sellers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name} ({c.phone})</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">임차인 / 매수인</p>
+              <Select value={buyerId || "_none"} onValueChange={(v) => setBuyerId(v === "_none" ? null : v)}>
+                <SelectTrigger className="h-9 text-sm">
+                  <span>{buyerId ? buyers.find((c) => c.id === buyerId)?.name || "선택" : "미지정 (나중에 추가)"}</span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">미지정 (나중에 추가)</SelectItem>
+                  {buyers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name} ({c.phone})</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <Button variant="outline" className="flex-1" onClick={onClose}>취소</Button>
+            <Button className="flex-1 gap-1.5" onClick={() => onConfirm(sellerId, buyerId)}>
+              <Handshake className="h-4 w-4" />시작
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function DetailPanel({ property, onClose, onMemoSaved }: { property: Property; onClose: () => void; onMemoSaved?: (id: string, memo: string) => void }) {
   const toggleFavorite = useStore((s) => s.toggleFavorite);
   const saveMemo = useStore((s) => s.saveMemo);
   const addDeal = useDealStore((s) => s.addDeal);
+  const { customers } = useCustomerStore();
+  const [showDealModal, setShowDealModal] = useState(false);
+  const [showDealCreated, setShowDealCreated] = useState(false);
+  const [showDeleteMyListing, setShowDeleteMyListing] = useState(false);
+  const loadProperties = useStore((s) => s.loadProperties);
+  const router = useRouter();
   const { containerRef, thumbRef } = useScrollReveal<HTMLDivElement>();
   const [tab, setTab] = useState<"info" | "area" | "legal" | "cost">("info");
   const [detail, setDetail] = useState<NaverDetailInfo | null>(null);
@@ -202,12 +276,46 @@ export function DetailPanel({ property, onClose, onMemoSaved }: { property: Prop
           variant="outline"
           size="sm"
           className="w-full text-sm gap-1.5"
-          onClick={async () => {
-            await addDeal({ propertyId: property.id, dealType: property.dealType });
-          }}
+          onClick={() => setShowDealModal(true)}
         >
           <Handshake className="h-4 w-4" />거래 시작
         </Button>
+
+        {showDealModal && (() => {
+          const sellers = customers.filter((c) => c.role === "seller" || c.role === "both");
+          const buyers = customers.filter((c) => c.role === "buyer" || c.role === "both");
+          return (
+            <StartDealModal
+              property={property}
+              sellers={sellers}
+              buyers={buyers}
+              onConfirm={async (sellerId, buyerId) => {
+                await addDeal({
+                  propertyId: property.id,
+                  dealType: property.dealType,
+                  sellerId: sellerId || undefined,
+                  buyerId: buyerId || undefined,
+                });
+                setShowDealModal(false);
+                setShowDealCreated(true);
+              }}
+              onClose={() => setShowDealModal(false)}
+            />
+          );
+        })()}
+
+        {showDealCreated && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="bg-card border rounded-lg shadow-lg p-6 w-[320px] space-y-4">
+              <p className="text-sm font-medium">거래가 생성되었습니다</p>
+              <p className="text-xs text-muted-foreground">해당 거래로 이동하시겠습니까?</p>
+              <div className="flex gap-2 justify-end">
+                <Button size="sm" variant="outline" onClick={() => setShowDealCreated(false)}>여기서 계속</Button>
+                <Button size="sm" onClick={() => { setShowDealCreated(false); router.push("/my-listings"); }}>거래 관리로 이동</Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex gap-1 bg-secondary rounded-lg p-1">
@@ -363,6 +471,39 @@ export function DetailPanel({ property, onClose, onMemoSaved }: { property: Prop
                 className={`w-full text-sm bg-secondary/50 border rounded-md p-2.5 resize-none h-[80px] focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground ${memoChanged ? "border-primary" : ""}`}
               />
             </div>
+
+            {/* 개인매물 삭제 */}
+            {property.isMyListing && (
+              <>
+                <Separator />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-xs text-red-500 hover:text-red-600 hover:bg-red-50"
+                  onClick={() => setShowDeleteMyListing(true)}
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1" />개인 매물 삭제
+                </Button>
+              </>
+            )}
+            {showDeleteMyListing && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                <div className="bg-card border rounded-lg shadow-lg p-6 w-[320px] space-y-4">
+                  <p className="text-sm font-medium">이 매물을 삭제하시겠습니까?</p>
+                  <p className="text-xs text-muted-foreground">{property.title}</p>
+                  <div className="flex gap-2 justify-end">
+                    <Button size="sm" variant="outline" onClick={() => setShowDeleteMyListing(false)}>취소</Button>
+                    <Button size="sm" variant="destructive" onClick={async () => {
+                      await supabase.from("properties").update({ is_active: false }).eq("id", property.id);
+                      useToastStore.getState().show("매물이 삭제되었습니다");
+                      setShowDeleteMyListing(false);
+                      onClose();
+                      loadProperties();
+                    }}>삭제</Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -593,7 +734,125 @@ function CompareView({ properties, onClose }: { properties: Property[]; onClose:
 }
 
 /* ── Main Page ── */
+const myListingPropTypes = ["상가", "건물", "사무실", "상가주택"];
+const myListingDealTypes = ["매매", "전세", "월세", "단기임대"];
+const myListingTradeCode: Record<string, string> = { "매매": "A1", "전세": "B1", "월세": "B2", "단기임대": "B3" };
+const myListingPropCode: Record<string, string> = { "상가": "D02", "건물": "D04", "사무실": "D01", "상가주택": "D05" };
+
+function MyListingForm({ dongList, onClose, onSaved }: { dongList: string[]; onClose: () => void; onSaved: () => void }) {
+  const [title, setTitle] = useState("");
+  const [dong, setDong] = useState("");
+  const [propType, setPropType] = useState("상가");
+  const [dealType, setDealType] = useState("월세");
+  const [price, setPrice] = useState("");
+  const [deposit, setDeposit] = useState("");
+  const [monthlyRent, setMonthlyRent] = useState("");
+  const [area, setArea] = useState("");
+  const [floorInfo, setFloorInfo] = useState("");
+  const [desc, setDesc] = useState("");
+
+  async function handleSubmit() {
+    if (!title.trim() || !dong) return;
+    const id = `MY-${Date.now()}`;
+    await supabase.from("properties").insert({
+      id, article_no: id, article_name: title.trim(),
+      real_estate_type: myListingPropCode[propType] || "D02", real_estate_type_name: propType,
+      trade_type: myListingTradeCode[dealType] || "B2", trade_type_name: dealType,
+      dong, address: `서울시 마포구 ${dong}`,
+      price: dealType === "매매" ? (Number(price) || 0) * 10000 : (Number(deposit) || 0) * 10000,
+      deal_or_warrant_price: "", warrant_price: (Number(deposit) || 0) * 10000,
+      monthly_rent: (Number(monthlyRent) || 0) * 10000,
+      area1: Number(area) || 0, area2: Number(area) || 0,
+      floor_info: floorInfo, direction: "",
+      description: desc.trim() || title.trim(), tag_list: [],
+      realtor_name: "", confirm_date: new Date().toISOString().split("T")[0],
+      source_url: "", is_my_listing: true, is_active: true,
+      last_seen_at: new Date().toISOString(),
+    });
+    useToastStore.getState().show("개인 매물이 등록되었습니다");
+    onSaved();
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-card border rounded-lg shadow-lg w-[480px] max-h-[90vh] overflow-y-auto">
+        <div className="p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold">개인 매물 등록</h2>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">매물명 *</p>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 합정역 1층 상가" className="h-9 text-sm" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">동 *</p>
+              <Select value={dong} onValueChange={setDong}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="동 선택" /></SelectTrigger>
+                <SelectContent>{dongList.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">유형</p>
+              <Select value={propType} onValueChange={setPropType}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>{myListingPropTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">거래 유형</p>
+            <Select value={dealType} onValueChange={setDealType}>
+              <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>{myListingDealTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          {dealType === "매매" ? (
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">매매가 (만원)</p>
+              <Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="h-9 text-sm" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">보증금 (만원)</p>
+                <Input type="number" value={deposit} onChange={(e) => setDeposit(e.target.value)} className="h-9 text-sm" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">월세 (만원)</p>
+                <Input type="number" value={monthlyRent} onChange={(e) => setMonthlyRent(e.target.value)} className="h-9 text-sm" />
+              </div>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">면적 (m²)</p>
+              <Input type="number" value={area} onChange={(e) => setArea(e.target.value)} className="h-9 text-sm" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">층 (예: 1/5)</p>
+              <Input value={floorInfo} onChange={(e) => setFloorInfo(e.target.value)} className="h-9 text-sm" />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">설명</p>
+            <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="매물 설명..." className="w-full text-sm border rounded-md p-2.5 resize-none h-[60px] focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button variant="outline" className="flex-1" onClick={onClose}>취소</Button>
+            <Button className="flex-1" onClick={handleSubmit} disabled={!title.trim() || !dong}>등록</Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Properties() {
+  const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const selectParam = searchParams?.get("select");
   const properties = useStore((s) => s.properties);
   const totalCount = useStore((s) => s.totalCount);
   const page = useStore((s) => s.page);
@@ -621,6 +880,7 @@ export default function Properties() {
   const [rentMinInput, setRentMinInput] = useState("");
   const [rentMaxInput, setRentMaxInput] = useState("");
   const [settingsApplied, setSettingsApplied] = useState(false);
+  const [showMyListingForm, setShowMyListingForm] = useState(false);
 
   useEffect(() => {
     function applySettings() {
@@ -641,17 +901,20 @@ export default function Properties() {
     if (useSettingsStore.persist.hasHydrated()) applySettings();
     else loadProperties();
     loadDongList();
+    useCustomerStore.getState().loadCustomers();
+    if (selectParam) selectProperty(selectParam);
     return unsub;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const compareCache = useStore((s) => s.compareCache);
   const selectedProperty = selectedId ? properties.find((p) => p.id === selectedId) : null;
-  const compareProperties = compareIds.map((id) => properties.find((p) => p.id === id)).filter(Boolean) as Property[];
+  const compareProperties = compareIds.map((id) => compareCache[id] || properties.find((p) => p.id === id)).filter(Boolean) as Property[];
 
   return (
     <div>
-      {showCompare && compareProperties.length >= 2 && (
+      {showCompare && compareIds.length >= 2 && (
         <div className="mb-4">
           <CompareView properties={compareProperties} onClose={() => setShowCompare(false)} />
         </div>
@@ -660,7 +923,28 @@ export default function Properties() {
       <div className="flex gap-6 h-[calc(100vh-3.5rem)]">
         {/* Left: table */}
         <div className="flex-1 min-w-0 max-w-3xl flex flex-col">
-          <h1 className="text-3xl font-bold mb-3">매물 목록</h1>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h1 className="text-3xl font-bold">매물 목록</h1>
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => setFilters({ source: "전체" })}
+                  className={`text-sm px-3 py-1 rounded-md transition-colors ${filters.source === "전체" ? "bg-primary text-primary-foreground font-medium" : "text-muted-foreground hover:bg-accent"}`}
+                >전체</button>
+                <button
+                  onClick={() => setFilters({ source: "네이버" })}
+                  className={`text-sm px-3 py-1 rounded-md transition-colors ${filters.source === "네이버" ? "bg-primary text-primary-foreground font-medium" : "text-muted-foreground hover:bg-accent"}`}
+                >네이버</button>
+                <button
+                  onClick={() => setFilters({ source: "개인매물" })}
+                  className={`text-sm px-3 py-1 rounded-md transition-colors ${filters.source === "개인매물" ? "bg-primary text-primary-foreground font-medium" : "text-muted-foreground hover:bg-accent"}`}
+                >개인매물</button>
+              </div>
+            </div>
+            <Button size="sm" className="gap-1.5" onClick={() => setShowMyListingForm(true)}>
+              <Plus className="h-4 w-4" />개인 매물 등록
+            </Button>
+          </div>
 
           {/* Filters */}
           <div className="flex items-center gap-2 flex-wrap mb-2">
@@ -895,6 +1179,8 @@ export default function Properties() {
           )}
         </div>
       </div>
+
+      {showMyListingForm && <MyListingForm dongList={dongList} onClose={() => setShowMyListingForm(false)} onSaved={loadProperties} />}
 
       {/* Bottom floating action bar — 왼쪽 */}
       {compareIds.length > 0 && (

@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useDealStore, Deal, DealStatus, DEAL_STATUSES } from "@/lib/deal-store";
 import { useCustomerStore, Customer } from "@/lib/customer-store";
+function fireConfetti() {
+  import("canvas-confetti").then((mod) => mod.default({ particleCount: 150, spread: 70, origin: { y: 0.6 } }));
+}
 import { formatMoney } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,9 +15,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Handshake, Plus, Trash2, X, MapPin, Phone, Building2, Users, Loader2, StickyNote,
+  Handshake, Plus, Trash2, X, MapPin, Phone, Building2, Users, Loader2, StickyNote, ExternalLink,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useToastStore } from "@/lib/toast-store";
 
@@ -299,16 +303,33 @@ function DealDetail({ deal, onClose }: { deal: Deal; onClose: () => void }) {
       <div className="p-5 space-y-4">
         {/* Header */}
         <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-lg font-bold">{deal.propertyTitle || "매물 미지정"}</h2>
-            {deal.propertyAddress && (
-              <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                <MapPin className="h-3.5 w-3.5" />{deal.propertyAddress}
-              </p>
-            )}
-          </div>
+          <h2 className="text-lg font-bold">거래 상세</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
         </div>
+
+        {/* 매물 카드 */}
+        {deal.propertyId ? (
+          <Link href={`/properties?select=${deal.propertyId}`} className="block border rounded-lg p-3 hover:bg-accent/50 transition-colors group">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-lg bg-secondary flex items-center justify-center shrink-0">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{deal.propertyTitle || "매물"}</p>
+                {deal.propertyAddress && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />{deal.propertyAddress.replace("서울시 마포구 ", "")}
+                  </p>
+                )}
+              </div>
+              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 shrink-0" />
+            </div>
+          </Link>
+        ) : (
+          <div className="border rounded-lg p-3 border-dashed">
+            <p className="text-xs text-muted-foreground text-center">매물 미지정</p>
+          </div>
+        )}
 
         {/* 상태 변경 */}
         <div className="space-y-1.5">
@@ -317,7 +338,12 @@ function DealDetail({ deal, onClose }: { deal: Deal; onClose: () => void }) {
             {DEAL_STATUSES.map((s) => (
               <button
                 key={s}
-                onClick={() => updateDeal(deal.id, { status: s })}
+                onClick={() => {
+                  if (s === "거래완료" && deal.status !== "거래완료") {
+                    fireConfetti();
+                  }
+                  updateDeal(deal.id, { status: s });
+                }}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
                   deal.status === s ? STATUS_COLORS[s] : "hover:bg-accent"
                 }`}
@@ -457,6 +483,7 @@ function DealDetail({ deal, onClose }: { deal: Deal; onClose: () => void }) {
 export default function DealsPage() {
   const { deals, loading, loadDeals, updateDeal, moveDeal } = useDealStore();
   const { loadCustomers } = useCustomerStore();
+  const dealParam = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("deal") : null;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showNewDeal, setShowNewDeal] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -468,6 +495,13 @@ export default function DealsPage() {
     loadDeals();
     loadCustomers();
   }, [loadDeals, loadCustomers]);
+
+  useEffect(() => {
+    if (dealParam && deals.length > 0 && !selectedId) {
+      const found = deals.find((d) => d.id === dealParam);
+      if (found) setSelectedId(found.id);
+    }
+  }, [dealParam, deals, selectedId]);
 
   const selectedDeal = selectedId ? deals.find((d) => d.id === selectedId) : null;
   const columns = DEAL_STATUSES.map((status) => ({
@@ -502,9 +536,13 @@ export default function DealsPage() {
               onDragLeave={() => { setDragOverStatus(null); setDropIndex(-1); }}
               onDrop={() => {
                 if (dragId) {
+                  const prevStatus = deals.find((d) => d.id === dragId)?.status;
                   moveDeal(dragId, status, dropIndex);
                   setJustDroppedId(dragId);
                   setTimeout(() => setJustDroppedId(null), 1000);
+                  if (status === "거래완료" && prevStatus !== "거래완료") {
+                    fireConfetti();
+                  }
                 }
                 setDragId(null);
                 setDragOverStatus(null);

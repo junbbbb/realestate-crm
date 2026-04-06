@@ -35,9 +35,11 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="w-[320px] space-y-6">
         <div className="text-center">
-          <Building2 className="h-10 w-10 mx-auto mb-3 text-foreground" />
-          <h1 className="text-2xl font-bold">부동산 CRM</h1>
-          <p className="text-sm text-muted-foreground mt-1">비밀번호를 입력하세요</p>
+          <div className="h-14 w-14 rounded-2xl bg-foreground flex items-center justify-center mx-auto mb-4">
+            <span className="text-background text-3xl font-black">B</span>
+          </div>
+          <h1 className="text-2xl font-extrabold tracking-tight">베스트공인중개</h1>
+          <p className="text-xs text-muted-foreground mt-3">비밀번호를 입력하세요</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

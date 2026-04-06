@@ -13,6 +13,7 @@ interface AppState {
   filters: PropertyFilters;
   selectedPropertyId: string | null;
   compareIds: string[];
+  compareCache: Record<string, Property>;
   loading: boolean;
   dongList: string[];
 
@@ -41,6 +42,7 @@ const defaultFilters: PropertyFilters = {
   rentMin: 0,
   rentMax: 0,
   floorFilter: "전체",
+  source: "전체",
   sortBy: "default",
 };
 
@@ -115,6 +117,7 @@ export const useStore = create<AppState>((set, get) => ({
   filters: defaultFilters,
   selectedPropertyId: null,
   compareIds: [],
+  compareCache: {},
   loading: false,
   dongList: [],
 
@@ -207,6 +210,13 @@ export const useStore = create<AppState>((set, get) => ({
         query = query.lte("monthly_rent", filters.rentMax * 10000);
       }
 
+      // 출처 필터
+      if (filters.source === "네이버") {
+        query = query.or("is_my_listing.eq.false,is_my_listing.is.null");
+      } else if (filters.source === "개인매물") {
+        query = query.eq("is_my_listing", true);
+      }
+
       // 정렬
       if (filters.sortBy === "price-asc") {
         query = query.order("price", { ascending: true });
@@ -285,14 +295,21 @@ export const useStore = create<AppState>((set, get) => ({
 
   selectProperty: (id) => set({ selectedPropertyId: id }),
   toggleCompare: (id) =>
-    set((s) => ({
-      compareIds: s.compareIds.includes(id)
+    set((s) => {
+      const removing = s.compareIds.includes(id);
+      const newIds = removing
         ? s.compareIds.filter((c) => c !== id)
-        : s.compareIds.length < 5
-          ? [...s.compareIds, id]
-          : s.compareIds,
-    })),
-  clearCompare: () => set({ compareIds: [] }),
+        : s.compareIds.length < 5 ? [...s.compareIds, id] : s.compareIds;
+      const newCache = { ...s.compareCache };
+      if (!removing) {
+        const prop = s.properties.find((p) => p.id === id);
+        if (prop) newCache[id] = prop;
+      } else {
+        delete newCache[id];
+      }
+      return { compareIds: newIds, compareCache: newCache };
+    }),
+  clearCompare: () => set({ compareIds: [], compareCache: {} }),
   saveMemo: (id, memo) => {
     set((s) => ({
       properties: s.properties.map((p) =>

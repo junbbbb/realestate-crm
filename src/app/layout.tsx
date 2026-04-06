@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "부동산 CRM",
+  title: "베스트공인중개",
   description: "이모의 부동산 매물 관리",
 };
 

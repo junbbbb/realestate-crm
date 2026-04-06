@@ -86,5 +86,6 @@ export interface PropertyFilters {
   rentMin: number;
   rentMax: number;
   floorFilter: "전체" | "1층" | "지하" | "2층 이상";
+  source: "전체" | "네이버" | "개인매물";
   sortBy: "default" | "yield" | "price-asc" | "price-desc";
 }

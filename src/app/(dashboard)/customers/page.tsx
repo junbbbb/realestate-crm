@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useCustomerStore, Customer, CustomerRole } from "@/lib/customer-store";
 import { formatMoney } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
@@ -11,8 +11,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Phone, Mail, MapPin, Trash2, Users, X, Building, Plus, Pencil, Loader2,
+  Phone, Mail, MapPin, Trash2, Users, X, Building, Plus, Pencil, Loader2, Handshake, ExternalLink,
 } from "lucide-react";
+import { useDealStore, Deal } from "@/lib/deal-store";
+import Link from "next/link";
 
 const dealTypes = ["매매", "전세", "월세", "단기임대"];
 const floorOptions = ["전체", "1층", "지하", "2층 이상"];
@@ -184,7 +186,17 @@ export default function Customers() {
   const [editCustomer, setEditCustomer] = useState<Customer | undefined>();
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
 
-  useEffect(() => { loadCustomers(); }, [loadCustomers]);
+  const { deals, loadDeals } = useDealStore();
+  useEffect(() => { loadCustomers(); loadDeals(); }, [loadCustomers, loadDeals]);
+
+  const dealsByCustomer = useMemo(() => {
+    const map: Record<string, Deal[]> = {};
+    for (const d of deals) {
+      if (d.sellerId) (map[d.sellerId] ??= []).push(d);
+      if (d.buyerId) (map[d.buyerId] ??= []).push(d);
+    }
+    return map;
+  }, [deals]);
 
   return (
     <div className="space-y-6">
@@ -249,6 +261,30 @@ export default function Customers() {
               )}
 
               {c.memo && <p className="text-xs text-muted-foreground border-t pt-2">{c.memo}</p>}
+
+              {/* 진행 중인 거래 */}
+              {(() => {
+                const customerDeals = dealsByCustomer[c.id] || [];
+                if (customerDeals.length === 0) return null;
+                return (
+                  <div className="border-t pt-2 space-y-1.5">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1"><Handshake className="h-3 w-3" />거래 {customerDeals.length}건</p>
+                    {customerDeals.map((d) => (
+                      <Link
+                        key={d.id}
+                        href={`/my-listings?deal=${d.id}`}
+                        className="flex items-center gap-2 text-xs p-1.5 rounded-md hover:bg-accent transition-colors group"
+                      >
+                        <Badge variant="outline" className="text-[10px] shrink-0">
+                          {d.status}
+                        </Badge>
+                        <span className="truncate flex-1">{d.propertyTitle || "매물 미지정"}</span>
+                        <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 shrink-0" />
+                      </Link>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           ))}
         </div>

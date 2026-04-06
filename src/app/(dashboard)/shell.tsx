@@ -43,9 +43,11 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         {/* Sidebar: full on xl+, icon-only on smaller */}
         <aside className="shrink-0 bg-sidebar border-r border-sidebar-border flex flex-col w-14 xl:w-56 transition-all duration-200">
           <div className="p-3 xl:p-6">
-            <Link href="/" className="flex items-center gap-2 text-sidebar-foreground">
-              <Building2 className="h-5 w-5 shrink-0" />
-              <span className="text-lg font-bold tracking-tight hidden xl:block">부동산 CRM</span>
+            <Link href="/" className="flex items-center gap-2.5 text-sidebar-foreground">
+              <div className="h-8 w-8 rounded-lg bg-foreground flex items-center justify-center shrink-0">
+                <span className="text-background text-lg font-black">B</span>
+              </div>
+              <span className="hidden xl:block text-base font-extrabold tracking-tight">베스트공인중개</span>
             </Link>
           </div>
           <nav className="flex-1 px-2 xl:px-3 space-y-1">

@@ -10,8 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import {
-  Settings, Monitor, Database, Trash2, CheckCircle, XCircle, Clock,
+  Settings, Monitor, Database, Trash2, CheckCircle, XCircle, Clock, LogOut,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 const pageSizeOptions = [20, 50, 100, 200];
 
@@ -28,6 +29,7 @@ function formatLogTime(ts: string) {
 }
 
 export default function SettingsPage() {
+  const router = useRouter();
   const {
     pageSize, setPageSize,
     yieldCalcMethod, setYieldCalcMethod,
@@ -209,6 +211,19 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
+
+      {/* 로그아웃 */}
+      <Separator />
+      <Button
+        variant="outline"
+        className="w-full text-red-500 hover:text-red-600 hover:bg-red-50 gap-2"
+        onClick={async () => {
+          await fetch("/api/auth", { method: "DELETE" });
+          router.push("/login");
+        }}
+      >
+        <LogOut className="h-4 w-4" />로그아웃
+      </Button>
     </div>
   );
 }
