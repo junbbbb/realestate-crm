@@ -1,8 +1,9 @@
-# 부동산 CRM 프로젝트 현황 (2026-04-06)
+# 베스트공인중개 CRM 프로젝트 현황 (2026-04-06)
 
 ## 개요
 이모를 위한 서울시 마포구 상업용 부동산 매물 관리 CRM.
 네이버 부동산 크롤링 → Supabase 저장 → Next.js 프론트엔드.
+**배포**: https://realestate-crm-eosin.vercel.app (PIN: 0641)
 
 ## Tech Stack
 - Next.js 16.2.2 (App Router) + React 19.2.4 + TypeScript
@@ -90,16 +91,29 @@
 
 ---
 
+## 인증
+- PIN 4자리 (0641) -> HMAC-SHA256 토큰 -> httpOnly 쿠키 30일
+- dashboard layout (서버 컴포넌트)에서 쿠키 검증
+- API 라우트도 쿠키 검증
+
 ## 페이지 구조
 
 ```
-/                    대시보드 (통계, 최���매물, 최근저장)
-/properties          매물 목록 (필��, 테이블, 상세패널)
+/login               로그인 (PIN 4자리)
+/                    대시보드 (통계, 최근매물, 최근저장)
+/properties          매물 목록 (탭: 전체/네이버/개인매물)
 /favorites           저장한 매물 (컬렉션 카드, 삭제됨 탭)
-/my-listings         거래 관리 (칸반: 거래전→거래중→거래완료)
-/customers           고객 관리 (카드, 등록/수정/삭제)
-/settings            설정 (표시설정, 크롤링 로그)
+/my-listings         거래 관리 (칸반 드래그앤드롭)
+/customers           고객 관리 (역할: buyer/seller/both)
+/settings            설정 (표시설정, 크롤링 로그, 로그아웃)
 ```
+
+## 매물 목록 탭 동작
+- 전체: 네이버 + 개인매물 통합, 필터 적용
+- 네이버: 크롤링 매물만, 필터 적용
+- 개인매물: 직접 등록 매물만, 필터 숨김 (전체 표시)
+- 탭별 필터 상태 독립 저장/복원
+- 크로스탭 비교 가능 (compareCache)
 
 ## Store 구조
 

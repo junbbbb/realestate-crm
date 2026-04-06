@@ -952,8 +952,8 @@ export default function Properties() {
             </Button>
           </div>
 
-          {/* Filters */}
-          <div className="flex items-center gap-2 flex-wrap mb-2">
+          {/* Filters — 개인매물 탭에서는 숨김 */}
+          {filters.source !== "개인매물" && <div className="flex items-center gap-2 flex-wrap mb-2">
             <div className="relative flex-1 min-w-[180px]">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input placeholder="매물명, 주소 검색..." value={filters.search} onChange={(e) => setFilters({ search: e.target.value })} className={`pl-9 h-9 bg-card text-sm border-2 ${filters.search ? "border-primary" : "border-transparent"}`} />
@@ -1098,7 +1098,7 @@ export default function Properties() {
               <RotateCcw className="h-3.5 w-3.5 mr-1" />초기화
             </Button>
             <span className="text-xs text-muted-foreground ml-auto">{loading ? "로딩 중..." : `${totalCount.toLocaleString()}건 · ${pageSize}개씩`}</span>
-          </div>
+          </div>}
 
           {/* Table */}
           {properties.length === 0 && !loading ? (
