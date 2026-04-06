@@ -7,25 +7,45 @@ This version has breaking changes — APIs, conventions, and file structure may 
 # 부동산 매물 관리 CRM (Real Estate CRM)
 
 ## Overview
-이모를 위한 부동산 매물 관리 CRM. 네이버 부동산 크롤링, 매물 검색/필터링/비교, 즐겨찾기, 고객 관리, 수익률 분석 기능 제공.
+이모를 위한 부동산 매물 관리 CRM. 네이버 부동산 크롤링, 매물 검색/필터링/비교, 컬렉션 저장, 고객 관리, 거래(딜) 칸반 관리 기능 제공.
 
 ## Tech Stack
-- Next.js (App Router) + TypeScript
+- Next.js 16.2.2 (App Router) + React 19.2.4 + TypeScript
 - shadcn/ui + Tailwind CSS v4 (UI)
 - Lucide React (아이콘)
-- Zustand (Client State)
-- Pretendard Variable (폰트)
+- Zustand 5.0.12 (Client State)
+- Supabase (PostgreSQL + RLS)
+- lz-string (네이버 지도 layer 인코딩)
+- Python curl_cffi (크롤링)
 
 ## Directory Structure
-- `src/app/` — Next.js App Router pages
-- `src/app/(dashboard)/` — 대시보드, 매물목록, 즐겨찾기, 내매물, 고객
+- `src/app/(dashboard)/` — 대시보드, 매물목록, 저장매물, 거래관리, 고객, 설정
+- `src/app/api/naver-detail/` — 네이버 상세 API 프록시
 - `src/components/ui/` — shadcn/ui 컴포넌트
-- `src/lib/` — store, mock-data, format, utils
+- `src/components/` — naver-map, toast, collection-popup
+- `src/lib/` — store, collection-store, customer-store, deal-store, settings-store, toast-store, format, naver-detail, supabase
 - `src/types/` — TypeScript 타입
-- `src/hooks/` — 커스텀 훅
-- `scripts/` — 크롤링 등 스크립트
+- `scripts/` — 크롤링 (crawl-mapo-fin.py, sync-to-supabase.py)
+- `supabase/migrations/` — DB 마이그레이션 SQL
 - `docs/` — 프로젝트 문서
-- `commands/` — Harness 커맨드
+
+## DB 테이블
+- `properties` — 매물 (크롤링 + 개인등록)
+- `deals` — 거래 (칸반: 거래전→거래중→거래완료)
+- `customers` — 고객 (buyer/seller/both)
+- `collections` — 저장 폴더 (소프트삭제)
+- `price_history` — 가격 변동 추적
+- `crawl_logs` — 크롤링 로그
+
+## 핵심 문서
+- `docs/PROJECT_STATUS.md` — 프로젝트 전체 현황, DB 구조, 데이터 흐름
+- `docs/decisions/design-decisions.md` — 설계 결정 + 시행착오
+- `docs/decisions/naver-detail-api.md` — 네이버 API 선택 과정
+
+## 가격 단위 주의
+- DB: 원 단위 (500000000 = 5억)
+- UI 필터: 만원 단위 (50000 = 5억) → 쿼리 시 ×10000
+- formatMoney(): 원 단위 → "5억", "1,200만" 한글 변환
 
 ## Context Injection Rules
 - DB/데이터 변경 → docs/architecture.md

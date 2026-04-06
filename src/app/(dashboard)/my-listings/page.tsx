@@ -14,23 +14,180 @@ import {
 import {
   Handshake, Plus, Trash2, X, MapPin, Phone, Building2, Users, Loader2, StickyNote,
 } from "lucide-react";
+import { useStore } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
+import { useToastStore } from "@/lib/toast-store";
+
+const propertyTypes = ["상가", "건물", "사무실", "상가주택"];
+const dealTypes = ["매매", "전세", "월세", "단기임대"];
+const tradeCodeMap: Record<string, string> = { "매매": "A1", "전세": "B1", "월세": "B2", "단기임대": "B3" };
+const propCodeMap: Record<string, string> = { "상가": "D02", "건물": "D04", "사무실": "D01", "상가주택": "D05" };
+
+function NewDealForm({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const dongList = useStore((s) => s.dongList);
+  const loadDongList = useStore((s) => s.loadDongList);
+  const { addDeal } = useDealStore();
+
+  useEffect(() => { loadDongList(); }, [loadDongList]);
+
+  const [title, setTitle] = useState("");
+  const [dong, setDong] = useState("");
+  const [propertyType, setPropertyType] = useState("상가");
+  const [dealType, setDealType] = useState("월세");
+  const [price, setPrice] = useState("");
+  const [deposit, setDeposit] = useState("");
+  const [monthlyRent, setMonthlyRent] = useState("");
+  const [area, setArea] = useState("");
+  const [floorInfo, setFloorInfo] = useState("");
+  const [memo, setMemo] = useState("");
+
+  async function handleSubmit() {
+    if (!title.trim() || !dong) return;
+    const priceVal = (Number(price) || 0) * 10000;
+    const depositVal = (Number(deposit) || 0) * 10000;
+    const rentVal = (Number(monthlyRent) || 0) * 10000;
+    const id = `MY-${Date.now()}`;
+
+    await supabase.from("properties").insert({
+      id, article_no: id,
+      article_name: title.trim(),
+      real_estate_type: propCodeMap[propertyType] || "D02",
+      real_estate_type_name: propertyType,
+      trade_type: tradeCodeMap[dealType] || "B2",
+      trade_type_name: dealType,
+      dong,
+      address: `서울시 마포구 ${dong}`,
+      price: dealType === "매매" ? priceVal : depositVal,
+      deal_or_warrant_price: "",
+      warrant_price: depositVal,
+      monthly_rent: rentVal,
+      area1: Number(area) || 0,
+      area2: Number(area) || 0,
+      floor_info: floorInfo,
+      direction: "",
+      description: title.trim(),
+      tag_list: [],
+      realtor_name: "",
+      confirm_date: new Date().toISOString().split("T")[0],
+      source_url: "",
+      is_my_listing: true,
+      is_active: true,
+      last_seen_at: new Date().toISOString(),
+    });
+
+    await addDeal({ propertyId: id, dealType, memo: memo.trim() });
+    onCreated();
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-card border rounded-lg shadow-lg w-[480px] max-h-[90vh] overflow-y-auto">
+        <div className="p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold">개인 매물 등록 + 거래 시작</h2>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+          </div>
+
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">매물명 *</p>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 합정역 1층 상가" className="h-9 text-sm" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">동 *</p>
+              <Select value={dong} onValueChange={setDong}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="동 선택" /></SelectTrigger>
+                <SelectContent>{dongList.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">유형</p>
+              <Select value={propertyType} onValueChange={setPropertyType}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>{propertyTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">거래 유형</p>
+            <Select value={dealType} onValueChange={setDealType}>
+              <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>{dealTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+
+          {dealType === "매매" ? (
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">매매가 (만원)</p>
+              <Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0" className="h-9 text-sm" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">보증금 (만원)</p>
+                <Input type="number" value={deposit} onChange={(e) => setDeposit(e.target.value)} placeholder="0" className="h-9 text-sm" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">월세 (만원)</p>
+                <Input type="number" value={monthlyRent} onChange={(e) => setMonthlyRent(e.target.value)} placeholder="0" className="h-9 text-sm" />
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">면적 (m²)</p>
+              <Input type="number" value={area} onChange={(e) => setArea(e.target.value)} placeholder="0" className="h-9 text-sm" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">층 (예: 1/5)</p>
+              <Input value={floorInfo} onChange={(e) => setFloorInfo(e.target.value)} placeholder="1/5" className="h-9 text-sm" />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">메모</p>
+            <textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="거래 관련 메모..." className="w-full text-sm border rounded-md p-2.5 resize-none h-[60px] focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <Button variant="outline" className="flex-1" onClick={onClose}>취소</Button>
+            <Button className="flex-1" onClick={handleSubmit} disabled={!title.trim() || !dong}>등록 + 거래 시작</Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const STATUS_COLORS: Record<DealStatus, string> = {
-  "상담": "bg-blue-50 text-blue-700 border-blue-200",
-  "매물투어": "bg-yellow-50 text-yellow-700 border-yellow-200",
-  "계약협상": "bg-orange-50 text-orange-700 border-orange-200",
-  "계약완료": "bg-green-50 text-green-700 border-green-200",
-  "무산": "bg-secondary text-muted-foreground",
+  "거래전": "bg-blue-50 text-blue-700 border-blue-200",
+  "거래중": "bg-orange-50 text-orange-700 border-orange-200",
+  "거래완료": "bg-green-50 text-green-700 border-green-200",
 };
 
-function DealCard({ deal, selected, onClick }: { deal: Deal; selected: boolean; onClick: () => void }) {
+function DealCard({ deal, index, selected, justDropped, onClick, onDragStart, onDragEnd, onDragOverIndex }: {
+  deal: Deal; index: number; selected: boolean; justDropped?: boolean; onClick: () => void;
+  onDragStart?: () => void; onDragEnd?: () => void; onDragOverIndex?: (i: number) => void;
+}) {
   return (
     <div
-      className={`bg-card border rounded-lg p-4 cursor-pointer transition-all ${selected ? "ring-2 ring-primary" : "hover:border-foreground/20"}`}
+      className={`bg-card border rounded-lg p-4 cursor-grab active:cursor-grabbing transition-all ${justDropped ? "ring-2 ring-primary animate-in zoom-in-95 duration-300" : ""} ${selected ? "ring-2 ring-primary" : "hover:border-foreground/20"}`}
       onClick={onClick}
+      draggable
+      onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; onDragStart?.(); }}
+      onDragEnd={() => onDragEnd?.()}
+      onDragOver={(e) => {
+        e.preventDefault();
+        const rect = e.currentTarget.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        onDragOverIndex?.(e.clientY < midY ? index : index + 1);
+      }}
     >
       <div className="flex items-start justify-between mb-2">
-        <Badge className={`text-[11px] border ${STATUS_COLORS[deal.status]}`}>{deal.status}</Badge>
         <Badge variant="outline" className="text-[11px]">{deal.dealType}</Badge>
       </div>
       <p className="font-medium text-sm truncate mb-1">{deal.propertyTitle || "매물 미지정"}</p>
@@ -48,11 +205,85 @@ function DealCard({ deal, selected, onClick }: { deal: Deal; selected: boolean; 
   );
 }
 
+function QuickCustomerForm({ role, onCreated, onClose }: { role: "seller" | "buyer"; onCreated: (id: string) => void; onClose: () => void }) {
+  const { addCustomer } = useCustomerStore();
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [customerMemo, setCustomerMemo] = useState("");
+
+  async function handleSubmit() {
+    if (!name.trim() || !phone.trim()) return;
+    await addCustomer({ name: name.trim(), phone: phone.trim(), role, memo: customerMemo.trim(), interestedIn: [], budgetMin: 0, budgetMax: 0 });
+    const { data } = await supabase.from("customers").select("id").eq("name", name.trim()).eq("phone", phone.trim()).order("created_at", { ascending: false }).limit(1);
+    if (data?.[0]) onCreated(data[0].id as string);
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-card border rounded-lg shadow-lg w-[380px]">
+        <div className="p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold">{role === "seller" ? "임대인" : "임차인"} 등록</h2>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">이름 *</p>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="이름" className="h-9 text-sm" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">연락처 *</p>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="010-0000-0000" className="h-9 text-sm" />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">메모</p>
+            <Input value={customerMemo} onChange={(e) => setCustomerMemo(e.target.value)} placeholder="특이사항" className="h-9 text-sm" />
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={onClose}>취소</Button>
+            <Button className="flex-1" onClick={handleSubmit} disabled={!name.trim() || !phone.trim()}>등록</Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CustomerMiniCard({ customer }: { customer: Customer }) {
+  return (
+    <div className="border rounded-lg p-3 bg-secondary/30 space-y-1.5">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium">{customer.name}</p>
+        <Badge variant="outline" className="text-[10px]">
+          {customer.role === "buyer" ? "임차인" : customer.role === "seller" ? "임대인" : "임대인/임차인"}
+        </Badge>
+      </div>
+      <div className="flex items-center gap-2 text-sm">
+        <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+        <a href={`tel:${customer.phone}`} className="text-primary hover:underline">{customer.phone}</a>
+      </div>
+      {customer.preferredArea && (
+        <p className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3" />{customer.preferredArea}</p>
+      )}
+      {customer.businessType && (
+        <p className="text-xs text-muted-foreground">업종: {customer.businessType}</p>
+      )}
+      {customer.memo && (
+        <p className="text-xs text-muted-foreground">{customer.memo}</p>
+      )}
+    </div>
+  );
+}
+
 function DealDetail({ deal, onClose }: { deal: Deal; onClose: () => void }) {
   const { updateDeal, deleteDeal } = useDealStore();
-  const { customers } = useCustomerStore();
+  const { customers, loadCustomers } = useCustomerStore();
   const [memo, setMemo] = useState(deal.memo);
   const [showDelete, setShowDelete] = useState(false);
+  const [addingSeller, setAddingSeller] = useState(false);
+  const [addingBuyer, setAddingBuyer] = useState(false);
   const memoChanged = memo !== deal.memo;
 
   useEffect(() => { setMemo(deal.memo); }, [deal.id, deal.memo]);
@@ -118,26 +349,32 @@ function DealDetail({ deal, onClose }: { deal: Deal; onClose: () => void }) {
           <p className="text-xs text-muted-foreground">임대인 / 매도인</p>
           <Select
             value={deal.sellerId || "_none"}
-            onValueChange={(v) => updateDeal(deal.id, { sellerId: v === "_none" ? null : v })}
+            onValueChange={(v) => {
+              if (v === "_add") { setAddingSeller(true); return; }
+              updateDeal(deal.id, { sellerId: v === "_none" ? null : v });
+            }}
           >
             <SelectTrigger className="h-9 text-sm">
-              <SelectValue placeholder="선택" />
+              <span>{deal.sellerName || "미지정"}</span>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="_none">미지정</SelectItem>
               {sellers.map((c) => (
                 <SelectItem key={c.id} value={c.id}>{c.name} ({c.phone})</SelectItem>
               ))}
+              <SelectItem value="_add" className="text-primary font-medium">+ 새 고객 추가</SelectItem>
             </SelectContent>
           </Select>
-          {deal.sellerName && deal.sellerId && (() => {
+          {addingSeller && (
+            <QuickCustomerForm
+              role="seller"
+              onCreated={(id) => { loadCustomers(); updateDeal(deal.id, { sellerId: id }); }}
+              onClose={() => setAddingSeller(false)}
+            />
+          )}
+          {deal.sellerId && (() => {
             const c = customers.find((x) => x.id === deal.sellerId);
-            return c ? (
-              <div className="flex items-center gap-2 text-sm">
-                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                <a href={`tel:${c.phone}`} className="text-primary hover:underline">{c.phone}</a>
-              </div>
-            ) : null;
+            return c ? <CustomerMiniCard customer={c} /> : null;
           })()}
         </div>
 
@@ -146,26 +383,32 @@ function DealDetail({ deal, onClose }: { deal: Deal; onClose: () => void }) {
           <p className="text-xs text-muted-foreground">임차인 / 매수인</p>
           <Select
             value={deal.buyerId || "_none"}
-            onValueChange={(v) => updateDeal(deal.id, { buyerId: v === "_none" ? null : v })}
+            onValueChange={(v) => {
+              if (v === "_add") { setAddingBuyer(true); return; }
+              updateDeal(deal.id, { buyerId: v === "_none" ? null : v });
+            }}
           >
             <SelectTrigger className="h-9 text-sm">
-              <SelectValue placeholder="선택" />
+              <span>{deal.buyerName || "미지정"}</span>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="_none">미지정</SelectItem>
               {buyers.map((c) => (
                 <SelectItem key={c.id} value={c.id}>{c.name} ({c.phone})</SelectItem>
               ))}
+              <SelectItem value="_add" className="text-primary font-medium">+ 새 고객 추가</SelectItem>
             </SelectContent>
           </Select>
-          {deal.buyerName && deal.buyerId && (() => {
+          {addingBuyer && (
+            <QuickCustomerForm
+              role="buyer"
+              onCreated={(id) => { loadCustomers(); updateDeal(deal.id, { buyerId: id }); }}
+              onClose={() => setAddingBuyer(false)}
+            />
+          )}
+          {deal.buyerId && (() => {
             const c = customers.find((x) => x.id === deal.buyerId);
-            return c ? (
-              <div className="flex items-center gap-2 text-sm">
-                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                <a href={`tel:${c.phone}`} className="text-primary hover:underline">{c.phone}</a>
-              </div>
-            ) : null;
+            return c ? <CustomerMiniCard customer={c} /> : null;
           })()}
         </div>
 
@@ -212,23 +455,25 @@ function DealDetail({ deal, onClose }: { deal: Deal; onClose: () => void }) {
 }
 
 export default function DealsPage() {
-  const { deals, loading, loadDeals } = useDealStore();
+  const { deals, loading, loadDeals, updateDeal, moveDeal } = useDealStore();
   const { loadCustomers } = useCustomerStore();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<DealStatus | "전체">("전체");
+  const [showNewDeal, setShowNewDeal] = useState(false);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverStatus, setDragOverStatus] = useState<DealStatus | null>(null);
+  const [dropIndex, setDropIndex] = useState<number>(-1);
+  const [justDroppedId, setJustDroppedId] = useState<string | null>(null);
 
   useEffect(() => {
     loadDeals();
     loadCustomers();
   }, [loadDeals, loadCustomers]);
 
-  const filtered = statusFilter === "전체" ? deals : deals.filter((d) => d.status === statusFilter);
   const selectedDeal = selectedId ? deals.find((d) => d.id === selectedId) : null;
-
-  const statusCounts = DEAL_STATUSES.reduce((acc, s) => {
-    acc[s] = deals.filter((d) => d.status === s).length;
-    return acc;
-  }, {} as Record<string, number>);
+  const columns = DEAL_STATUSES.map((status) => ({
+    status,
+    deals: deals.filter((d) => d.status === status).sort((a, b) => a.position - b.position),
+  }));
 
   return (
     <div className="space-y-4">
@@ -237,62 +482,91 @@ export default function DealsPage() {
           <h1 className="text-3xl font-bold">거래 관리</h1>
           <p className="text-muted-foreground text-sm mt-1">{deals.length}건</p>
         </div>
+        <Button size="sm" className="gap-1.5" onClick={() => setShowNewDeal(true)}>
+          <Plus className="h-4 w-4" />개인 매물 추가
+        </Button>
       </div>
 
-      {/* 상태 필터 탭 */}
-      <div className="flex gap-1.5 flex-wrap">
-        <button
-          onClick={() => setStatusFilter("전체")}
-          className={`text-xs px-3 py-1.5 rounded-md transition-colors ${statusFilter === "전체" ? "bg-primary text-primary-foreground font-medium" : "text-muted-foreground hover:bg-accent"}`}
-        >
-          전체 {deals.length}
-        </button>
-        {DEAL_STATUSES.map((s) => (
-          <button
-            key={s}
-            onClick={() => setStatusFilter(s)}
-            className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${statusFilter === s ? STATUS_COLORS[s] + " font-medium" : "text-muted-foreground hover:bg-accent"}`}
-          >
-            {s} {statusCounts[s] || 0}
-          </button>
-        ))}
-      </div>
+      {showNewDeal && <NewDealForm onClose={() => setShowNewDeal(false)} onCreated={loadDeals} />}
 
-      <div className="flex gap-6 h-[calc(100vh-12rem)]">
-        {/* 왼쪽: 거래 카드 목록 */}
-        <div className="flex-1 min-w-0 overflow-y-auto">
-          {loading ? (
-            <div className="text-center py-20"><Loader2 className="h-8 w-8 mx-auto text-muted-foreground/50 animate-spin" /></div>
-          ) : filtered.length === 0 ? (
-            <div className="text-center py-20">
-              <Handshake className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
-              <p className="font-medium">{statusFilter === "전체" ? "진행 중인 거래가 없습니다" : `${statusFilter} 상태의 거래가 없습니다`}</p>
-              <p className="text-sm text-muted-foreground mt-1">매물 상세에서 "거래 시작"으로 추가하세요</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {filtered.map((d) => (
-                <DealCard key={d.id} deal={d} selected={selectedId === d.id} onClick={() => setSelectedId(d.id)} />
-              ))}
-            </div>
-          )}
-        </div>
+      {loading ? (
+        <div className="text-center py-20"><Loader2 className="h-8 w-8 mx-auto text-muted-foreground/50 animate-spin" /></div>
+      ) : (
+        <div className="flex gap-4 h-[calc(100vh-8rem)]">
+          {/* 칸반 컬럼들 */}
+          {columns.map(({ status, deals: columnDeals }) => (
+            <div
+              key={status}
+              className="flex-1 min-w-[240px] flex flex-col"
+              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverStatus(status); }}
+              onDragLeave={() => { setDragOverStatus(null); setDropIndex(-1); }}
+              onDrop={() => {
+                if (dragId) {
+                  moveDeal(dragId, status, dropIndex);
+                  setJustDroppedId(dragId);
+                  setTimeout(() => setJustDroppedId(null), 1000);
+                }
+                setDragId(null);
+                setDragOverStatus(null);
+                setDropIndex(-1);
+              }}
+            >
+              {/* 컬럼 헤더 */}
+              <div className={`flex items-center justify-between px-3 py-2 rounded-t-lg border-b-2 ${STATUS_COLORS[status]}`}>
+                <span className="text-sm font-bold">{status}</span>
+                <span className="text-xs font-medium">{columnDeals.length}</span>
+              </div>
 
-        {/* 오른쪽: 거래 상세 */}
-        <div className="w-[380px] shrink-0">
-          {selectedDeal ? (
-            <DealDetail deal={selectedDeal} onClose={() => setSelectedId(null)} />
-          ) : (
-            <div className="h-full flex items-center justify-center border rounded-lg">
-              <div className="text-center">
-                <Handshake className="h-8 w-8 text-muted-foreground/20 mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">거래를 선택하면</p>
-                <p className="text-sm text-muted-foreground">상세 정보가 여기에 표시됩니다</p>
+              {/* 카드 목록 */}
+              <div
+                className={`flex-1 overflow-y-auto rounded-b-lg p-2 transition-colors ${dragOverStatus === status && dragId ? "bg-primary/5" : "bg-secondary/30"}`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  // 빈 영역 (카드 아래쪽)에 드래그 시 맨 아래로
+                  const target = e.target as HTMLElement;
+                  if (target === e.currentTarget) setDropIndex(columnDeals.length);
+                }}
+              >
+                {columnDeals.length === 0 ? (
+                  <div className={`text-center py-8 rounded-lg border-2 border-dashed transition-colors ${dragOverStatus === status && dragId ? "border-primary/40 bg-primary/5" : "border-transparent"}`}>
+                    <p className="text-xs text-muted-foreground">{dragOverStatus === status && dragId ? "여기에 놓으세요" : "없음"}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-0">
+                    {columnDeals.map((d, i) => (
+                      <div key={d.id}>
+                        {/* 드롭 인디���이터 - 카드 위 */}
+                        <div className={`h-0.5 mx-1 rounded-full transition-all my-1 ${dragId && dragOverStatus === status && dropIndex === i ? "bg-primary" : "bg-transparent"}`} />
+                        <DealCard
+                          deal={d}
+                          index={i}
+                          selected={selectedId === d.id}
+                          justDropped={justDroppedId === d.id}
+                          onClick={() => setSelectedId(d.id)}
+                          onDragStart={() => setDragId(d.id)}
+                          onDragEnd={() => { setDragId(null); setDragOverStatus(null); setDropIndex(-1); }}
+                          onDragOverIndex={(idx) => setDropIndex(idx)}
+                        />
+                        {/* 드롭 인디케이터 - 마지막 카드 아래 */}
+                        {i === columnDeals.length - 1 && (
+                          <div className={`h-0.5 mx-1 rounded-full transition-all my-1 ${dragId && dragOverStatus === status && dropIndex === columnDeals.length ? "bg-primary" : "bg-transparent"}`} />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
+          ))}
+
+          {/* 오른쪽: 거래 상세 */}
+          {selectedDeal && (
+            <div className="w-[380px] shrink-0">
+              <DealDetail deal={selectedDeal} onClose={() => setSelectedId(null)} />
+            </div>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
 }
