@@ -151,6 +151,62 @@
   → 클라이언트 5분 캐시
 ```
 
+## 네이버 상세 API 프록시 체인 (2026-04-07)
+
+```
+클라이언트 → /api/naver-proxy (Vercel Python runtime)
+  → Decodo 프록시 (gate.decodo.com:10001, 한국 주거 IP)
+    → curl_cffi (Chrome TLS 지문 위장)
+      → fin.land.naver.com basicInfo + agent API (병렬)
+```
+
+- `api/naver-proxy.py`: Vercel serverless Python, curl_cffi + `impersonate="chrome"`
+- Decodo: 한국 주거 IP 프록시 (PROXY_USER/PROXY_PASS 환경변수)
+- fallback 순서: Python proxy → 로컬 프록시(localhost:4000) → Next.js API route
+
+## Supabase 네이버 상세 캐시 (2026-04-07)
+
+### naver_detail_cache
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| article_number | text PK | 매물번호 |
+| data | jsonb | 상세 정보 (주차, 욕실, 건축일, 중개사 등) |
+| fetched_at | timestamptz | 캐시 저장 시각 |
+
+- **TTL**: 인메모리 5분, DB 24시간
+- **정리**: 저장 시 5% 확률로 7일 초과 행 삭제
+- `src/lib/naver-detail.ts`에서 관리 (getDbCache/setDbCache)
+
+## 가격 변동 랭킹 시스템 (2026-04-07)
+
+### price_change_rankings
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| id | serial PK | |
+| article_no | text | 매물번호 |
+| article_name | text | 제목 |
+| property_type | text | 유형 |
+| trade_type | text | 거래유형 (한글) |
+| change_type | text | increase / decrease |
+| prev_price | bigint | 이전 가격 |
+| current_price | bigint | 현재 가격 |
+| rate | numeric(8,2) | 변동률 % |
+| updated_at | timestamptz | 갱신 시각 |
+
+- **계산 시점**: sync-to-supabase.py 실행 시 (크롤링 후)
+- **로직**: prev_price >= 100만원 필터 → 변동률 순 정렬 → 상승 TOP 6 + 하락 TOP 6
+- **갱신 방식**: 전체 삭제 후 재삽입 (매 동기화)
+
+## 대시보드 가격 변동 카드 (2026-04-07)
+
+- price_change_rankings 테이블에서 전체 조회 → 상승/하락 분리
+- 상승 TOP (빨간색), 하락 TOP (파란색) 2열 카드
+- 변동률 % + 이전→현재 가격 표시
+- 클릭 시 매물 상세 모달 (가격 변동 이력 패널 포함)
+- 로딩 중 스켈레톤 UI
+
+---
+
 ## 네이�� 지도 링크 (layer 파라미터)
 
 fin.land의 layer 파라미터는 lz-string으로 압축된 JSON:

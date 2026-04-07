@@ -103,3 +103,40 @@ properties ←─ deals ──→ customers
 - 메모 저장
 
 **에러 처리**: DB 에러 시 loadDeals()/loadCollections()로 rollback
+
+## 2026-04-07
+
+### 13. Decodo 프록시 + curl_cffi 선택
+
+**결정**: Vercel Python runtime에서 curl_cffi + Decodo 프록시로 네이버 API 호출
+
+**이유**:
+- 네이버 fin.land API는 TLS 지문(JA3)으로 봇 차단 → Python requests/httpx로는 403
+- curl_cffi의 `impersonate="chrome"`이 실제 Chrome TLS 지문 생성
+- Decodo: 한국 주거 IP 프록시 → 해외 서버(Vercel)에서도 한국 접속으로 인식
+- Vercel Python runtime에서 curl_cffi 구동 가능 확인 완료
+
+**대안 검토**:
+- Playwright/Puppeteer: Vercel serverless에서 바이너리 크기 초과
+- 일반 프록시: TLS 지문 문제 해결 안 됨
+
+### 14. 사전 계산 랭킹 테이블 (price_change_rankings)
+
+**결정**: 동기화 시 가격 변동 TOP을 미리 계산하여 별도 테이블에 저장
+
+**이유**:
+- 대시보드 로드마다 전체 properties 스캔 + 정렬하면 느림 (~20,000건)
+- 랭킹은 크롤링 동기화 때만 변경됨 (1일 1~2회)
+- 12행 고정 테이블 → 대시보드 쿼리 O(1)
+- 전체 삭제 후 재삽입 방식으로 항상 최신 상태 보장
+
+### 15. Supabase 네이버 상세 캐시
+
+**결정**: naver_detail_cache 테이블에 상세 정보를 24시간 캐싱
+
+**이유**:
+- 네이버 API 호출은 프록시 비용 + rate limit 위험
+- 같은 매물 상세를 여러 번 조회하는 패턴 (목록↔상세 왕복)
+- 인메모리 캐시(5분)는 페이지 새로고침 시 소실
+- DB 캐시(24시간)로 프록시 호출 최소화
+- 5% 확률 정리로 오래된 캐시 자동 삭제 (별도 cron 불필요)

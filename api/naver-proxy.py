@@ -5,6 +5,10 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 
 class handler(BaseHTTPRequestHandler):
+    def _cors_headers(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+
     def do_GET(self):
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
@@ -16,6 +20,7 @@ class handler(BaseHTTPRequestHandler):
         if not article or not real_estate or not trade:
             self.send_response(400)
             self.send_header("Content-Type", "application/json")
+            self._cors_headers()
             self.end_headers()
             self.wfile.write(json.dumps({"error": "missing params"}).encode())
             return
@@ -27,6 +32,7 @@ class handler(BaseHTTPRequestHandler):
         if not cookie or not proxy_user or not proxy_pass:
             self.send_response(500)
             self.send_header("Content-Type", "application/json")
+            self._cors_headers()
             self.end_headers()
             self.wfile.write(json.dumps({"error": "env vars not set"}).encode())
             return
@@ -77,12 +83,13 @@ class handler(BaseHTTPRequestHandler):
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
+            self._cors_headers()
             self.end_headers()
             self.wfile.write(json.dumps(result, ensure_ascii=False).encode("utf-8"))
 
         except Exception as e:
             self.send_response(502)
             self.send_header("Content-Type", "application/json")
+            self._cors_headers()
             self.end_headers()
-            self.wfile.write(json.dumps({"error": str(e)}).encode())
+            self.wfile.write(json.dumps({"error": "proxy failed"}).encode())

@@ -5,7 +5,7 @@ import { useStore } from "@/lib/store";
 import { useCollectionStore } from "@/lib/collection-store";
 import { supabase } from "@/lib/supabase";
 import { formatMoney, formatPrice } from "@/lib/format";
-import { Building2, Heart, FolderOpen, Users, TrendingUp, TrendingDown, MapPin, Bookmark, Clock, ArrowUpRight, ArrowDownRight, X, Loader2 } from "lucide-react";
+import { Building2, FolderOpen, Users, MapPin, Bookmark, Clock, ArrowUpRight, ArrowDownRight, X, Loader2 } from "lucide-react";
 import { mapSupabaseToProperty } from "@/lib/store";
 import { DetailPanel } from "@/app/(dashboard)/properties/page";
 import { Property } from "@/types";

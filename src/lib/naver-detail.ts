@@ -36,6 +36,7 @@ export interface NaverDetailInfo {
 
 const cache = new Map<string, { data: NaverDetailInfo; ts: number }>();
 const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_MAX = 200;
 const DB_CACHE_TTL = 24 * 60 * 60 * 1000; // 24시간
 
 async function getDbCache(articleNumber: string): Promise<NaverDetailInfo | null> {
@@ -63,62 +64,31 @@ async function setDbCache(articleNumber: string, detail: NaverDetailInfo): Promi
     await supabase
       .from("naver_detail_cache")
       .upsert({ article_number: articleNumber, data: detail, fetched_at: new Date().toISOString() });
-    // 7일 지난 캐시 정리 (매 저장 시 확률적으로)
-    if (Math.random() < 0.05) {
-      const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      supabase.from("naver_detail_cache").delete().lt("fetched_at", cutoff).then();
-    }
   } catch (e) {
     console.warn("setDbCache failed:", e);
   }
 }
 
-const LOCAL_PROXY = "http://localhost:4000/naver-detail";
-
-async function fetchViaPythonProxy(articleNumber: string, realEstateType: string, tradeType: string) {
-  const url = `/api/naver-proxy?articleNumber=${articleNumber}&realEstateType=${realEstateType}&tradeType=${tradeType}`;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function fetchWithTimeout(url: string, timeoutMs: number): Promise<any> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12000);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, { signal: controller.signal });
-    if (!res.ok) throw new Error(`python proxy ${res.status}`);
+    if (!res.ok) throw new Error(`${res.status}`);
     const json = await res.json();
     if (!json.basicInfo && !json.agentInfo) throw new Error("empty");
     return json;
   } finally {
-    clearTimeout(timeout);
+    clearTimeout(timer);
   }
 }
 
-async function fetchViaLocalProxy(articleNumber: string, realEstateType: string, tradeType: string) {
-  const url = `${LOCAL_PROXY}?articleNumber=${articleNumber}&realEstateType=${realEstateType}&tradeType=${tradeType}`;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 3000);
-  try {
-    const res = await fetch(url, { signal: controller.signal });
-    if (!res.ok) throw new Error(`proxy ${res.status}`);
-    const json = await res.json();
-    if (!json.basicInfo && !json.agentInfo) throw new Error("empty");
-    return json;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-async function fetchViaServer(articleNumber: string, realEstateType: string, tradeType: string) {
-  const url = `/api/naver-detail?articleNumber=${articleNumber}&realEstateType=${realEstateType}&tradeType=${tradeType}`;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
-  try {
-    const res = await fetch(url, { signal: controller.signal });
-    if (!res.ok) throw new Error(`server ${res.status}`);
-    const json = await res.json();
-    if (!json.basicInfo && !json.agentInfo) throw new Error("empty response");
-    return json;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
+const ENDPOINTS = [
+  { base: "/api/naver-proxy", timeout: 12000 },
+  { base: "http://localhost:4000/naver-detail", timeout: 3000 },
+  { base: "/api/naver-detail", timeout: 10000 },
+];
 
 export async function fetchNaverDetail(
   articleNumber: string,
@@ -138,23 +108,16 @@ export async function fetchNaverDetail(
     }
   }
 
+  // Fallback 순서: Python proxy → 로컬 프록시 → 서버 API
   let json;
-  try {
-    // 1차: Python API (curl_cffi Chrome 위장)
-    json = await fetchViaPythonProxy(articleNumber, realEstateType, tradeType);
-  } catch {
+  const params = `articleNumber=${articleNumber}&realEstateType=${realEstateType}&tradeType=${tradeType}`;
+  for (const ep of ENDPOINTS) {
     try {
-      // 2차: 로컬 프록시 (사무실 PC, 주거용 한국 IP)
-      json = await fetchViaLocalProxy(articleNumber, realEstateType, tradeType);
-    } catch {
-      try {
-        // 3차: 서버 API route
-        json = await fetchViaServer(articleNumber, realEstateType, tradeType);
-      } catch {
-        return null;
-      }
-    }
+      json = await fetchWithTimeout(`${ep.base}?${params}`, ep.timeout);
+      break;
+    } catch { continue; }
   }
+  if (!json) return null;
 
   try {
     const basic = json.basicInfo;
@@ -211,6 +174,7 @@ export async function fetchNaverDetail(
       detail.profileImageUrl = agent.profileImageUrl;
     }
 
+    if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value!);
     cache.set(articleNumber, { data: detail, ts: Date.now() });
     setDbCache(articleNumber, detail);
     return detail;
