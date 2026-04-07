@@ -941,6 +941,15 @@ export default function Properties() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // userId 세팅 후 재조회 (새로고침 시 AuthProvider 비동기 완료 후)
+  const authUserId = useAuthStore((s) => s.userId);
+  useEffect(() => {
+    if (authUserId && settingsApplied) {
+      loadProperties();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUserId]);
+
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const compareCache = useStore((s) => s.compareCache);
   const selectedProperty = selectedId ? properties.find((p) => p.id === selectedId) : null;
