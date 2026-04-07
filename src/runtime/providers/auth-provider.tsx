@@ -17,6 +17,7 @@ import { PIN_USER_ID } from "@/config/constants";
  */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const setAuth = useAuthStore((s) => s.setAuth);
+  const isLoading = useAuthStore((s) => s.isLoading);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,6 +66,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe();
     };
   }, [setAuth]);
+
+  // userId 세팅 완료될 때까지 children 렌더링 차단
+  // → 모든 하위 컴포넌트가 userId가 준비된 상태에서 데이터 로드
+  if (isLoading) {
+    return null;
+  }
 
   return <>{children}</>;
 }

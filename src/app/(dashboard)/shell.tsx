@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCollectionStore } from "@/lib/collection-store";
 import { AuthProvider } from "@/runtime/providers/auth-provider";
+import { useAuthStore } from "@/runtime/stores/auth-store";
 import {
   LayoutDashboard,
   Building2,
@@ -32,13 +33,19 @@ const nav = [
 
 const mobileNav = nav.filter((n) => n.href !== "/my-listings");
 
-export default function Shell({ children }: { children: React.ReactNode }) {
-  const path = usePathname();
+function ShellInner({ children }: { children: React.ReactNode }) {
   const loadCollections = useCollectionStore((s) => s.loadCollections);
 
   useEffect(() => {
+    // AuthProvider가 userId 세팅 완료 후에만 렌더되므로 안전
     loadCollections();
   }, [loadCollections]);
+
+  return <>{children}</>;
+}
+
+export default function Shell({ children }: { children: React.ReactNode }) {
+  const path = usePathname();
 
   return (
     <AuthProvider>
@@ -85,7 +92,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
 
         {/* Content */}
         <main className="flex-1 py-4 px-4 md:px-6 overflow-auto pb-20 md:pb-4">
-          <div>{children}</div>
+          <ShellInner>{children}</ShellInner>
         </main>
         <Toaster />
 
