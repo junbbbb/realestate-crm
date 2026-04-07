@@ -57,7 +57,7 @@ export default function Dashboard() {
       // 매물 정보 조회
       const { data: props } = await supabase
         .from("properties")
-        .select("id, article_no, property_type, trade_type, deal_or_warrant_price")
+        .select("id, article_no, article_name, property_type, trade_type")
         .in("id", articleIds);
 
       const propMap = new Map((props || []).map((p) => [p.id, p]));
@@ -95,7 +95,7 @@ export default function Dashboard() {
           prevPrice,
           rate,
           recordedAt: h.recorded_at,
-          title: prop?.deal_or_warrant_price,
+          title: prop?.article_name,
           propertyType: prop?.property_type,
           dealType: tradeMap[prop?.trade_type] ?? prop?.trade_type,
         });
