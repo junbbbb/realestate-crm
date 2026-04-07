@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCollectionStore } from "@/lib/collection-store";
+import { AuthProvider } from "@/runtime/providers/auth-provider";
 import {
   LayoutDashboard,
   Building2,
@@ -40,6 +41,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   }, [loadCollections]);
 
   return (
+    <AuthProvider>
     <TooltipProvider>
       <div className="flex min-h-screen">
         {/* Sidebar: hidden on mobile, icon-only on md, full on xl+ */}
@@ -111,5 +113,6 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         </nav>
       </div>
     </TooltipProvider>
+    </AuthProvider>
   );
 }

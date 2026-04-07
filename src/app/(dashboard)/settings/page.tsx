@@ -218,7 +218,12 @@ export default function SettingsPage() {
         variant="outline"
         className="w-full text-red-500 hover:text-red-600 hover:bg-red-50 gap-2"
         onClick={async () => {
+          // PIN 쿠키 삭제
           await fetch("/api/auth", { method: "DELETE" });
+          // Supabase 세션 삭제 (Google 로그인 등)
+          const { createSupabaseBrowserClient } = await import("@/lib/supabase-auth");
+          const supabase = createSupabaseBrowserClient();
+          await supabase.auth.signOut();
           router.push("/login");
         }}
       >

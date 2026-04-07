@@ -1,11 +1,8 @@
 import { create } from "zustand";
-import { Collection, CollectionEntry } from "@/types";
-import { supabase } from "@/lib/supabase";
+import { Collection } from "@/types";
 import { useToastStore } from "@/lib/toast-store";
-
-function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-}
+import { useAuthStore } from "@/runtime/stores/auth-store";
+import * as collectionRepo from "@/repos/collection-repo";
 
 interface CollectionState {
   collections: Collection[];
@@ -30,45 +27,23 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
   loadCollections: async () => {
     if (get().loading) return;
     set({ loading: true });
-    const { data, error } = await supabase
-      .from("collections")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (error) {
-      console.error("Collection load error:", error);
-      set({ loading: false });
-      return;
-    }
-    const all = (data || []).map((r: Record<string, unknown>) => ({
-      id: r.id as string,
-      name: r.name as string,
-      propertyIds: (r.property_ids as string[]) || [],
-      entries: (r.entries as CollectionEntry[]) || [],
-      createdAt: r.created_at as string,
-      isDeleted: (r.is_deleted as boolean) || false,
-    }));
+    const userId = useAuthStore.getState().userId;
+    const { active, deleted } = await collectionRepo.loadCollections(userId);
     set({
-      collections: all.filter((c) => !c.isDeleted),
-      deletedCollections: all.filter((c) => c.isDeleted),
+      collections: active,
+      deletedCollections: deleted,
       loading: false,
     });
   },
 
   addCollection: async (name) => {
-    const id = generateId();
-    const now = new Date().toISOString();
-    const { error } = await supabase.from("collections").insert({
-      id,
-      name,
-      property_ids: [],
-      entries: [],
-      created_at: now,
-    });
-    if (error) {
-      console.error("Collection add error:", error);
+    const userId = useAuthStore.getState().userId;
+    const id = await collectionRepo.addCollection(userId, name);
+    if (!id) {
       useToastStore.getState().show("컬렉션 생성 실패. 다시 시도해주세요");
       return "";
     }
+    const now = new Date().toISOString();
     set((s) => ({
       collections: [
         { id, name, propertyIds: [], entries: [], createdAt: now },
@@ -82,13 +57,13 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
   removeCollection: (id) => {
     const col = get().collections.find((c) => c.id === id);
     if (!col) return;
+    // Optimistic update
     set((s) => ({
       collections: s.collections.filter((c) => c.id !== id),
       deletedCollections: [{ ...col }, ...s.deletedCollections],
     }));
-    supabase.from("collections").update({ is_deleted: true, updated_at: new Date().toISOString() }).eq("id", id).then(({ error }) => {
-      if (error) {
-        console.error("Collection delete error:", error);
+    collectionRepo.removeCollection(id).then((ok) => {
+      if (!ok) {
         useToastStore.getState().show("삭제 실패. 다시 시도해주세요");
         get().loadCollections();
         return;
@@ -104,9 +79,8 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
       deletedCollections: s.deletedCollections.filter((c) => c.id !== id),
       collections: [{ ...col }, ...s.collections],
     }));
-    supabase.from("collections").update({ is_deleted: false, updated_at: new Date().toISOString() }).eq("id", id).then(({ error }) => {
-      if (error) console.error("Collection restore error:", error);
-      else useToastStore.getState().show(`"${col.name}" 컬렉션이 복원되었습니다`);
+    collectionRepo.restoreCollection(id).then((ok) => {
+      if (ok) useToastStore.getState().show(`"${col.name}" 컬렉션이 복원되었습니다`);
     });
   },
 
@@ -115,9 +89,8 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
     set((s) => ({
       deletedCollections: s.deletedCollections.filter((c) => c.id !== id),
     }));
-    supabase.from("collections").delete().eq("id", id).then(({ error }) => {
-      if (error) console.error("Collection permanent delete error:", error);
-      else useToastStore.getState().show(`"${name}" 컬렉션이 영구 삭제되었습니다`);
+    collectionRepo.permanentDeleteCollection(id).then((ok) => {
+      if (ok) useToastStore.getState().show(`"${name}" 컬렉션이 영구 삭제되었습니다`);
     });
   },
 
@@ -127,9 +100,7 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
         c.id === id ? { ...c, name } : c
       ),
     }));
-    supabase.from("collections").update({ name, updated_at: new Date().toISOString() }).eq("id", id).then(({ error }) => {
-      if (error) console.error("Collection rename error:", error);
-    });
+    collectionRepo.renameCollection(id, name);
   },
 
   addToCollection: (collectionId, propertyIds) => {
@@ -143,6 +114,7 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
     const updatedPropertyIds = [...col.propertyIds, ...newIds];
     const updatedEntries = [...(col.entries || []), ...newEntries];
 
+    // Optimistic update
     set((s) => ({
       collections: s.collections.map((c) =>
         c.id === collectionId
@@ -150,13 +122,7 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
           : c
       ),
     }));
-    supabase.from("collections").update({
-      property_ids: updatedPropertyIds,
-      entries: updatedEntries,
-      updated_at: new Date().toISOString(),
-    }).eq("id", collectionId).then(({ error }) => {
-      if (error) console.error("Collection update error:", error);
-    });
+    collectionRepo.addToCollection(collectionId, updatedPropertyIds, updatedEntries);
     useToastStore.getState().show(`"${col.name}"에 저장되었습니다`);
   },
 
@@ -173,13 +139,7 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
           : c
       ),
     }));
-    supabase.from("collections").update({
-      property_ids: updatedPropertyIds,
-      entries: updatedEntries,
-      updated_at: new Date().toISOString(),
-    }).eq("id", collectionId).then(({ error }) => {
-      if (error) console.error("Collection remove error:", error);
-    });
+    collectionRepo.removeFromCollection(collectionId, updatedPropertyIds, updatedEntries);
   },
 
   getCollectionsForProperty: (propertyId) =>

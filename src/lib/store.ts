@@ -1,7 +1,10 @@
 import { create } from "zustand";
 import { Property, PropertyFilters } from "@/types";
-import { supabase, SupabaseProperty } from "@/lib/supabase";
+import { SupabaseProperty } from "@/lib/supabase";
 import { useToastStore } from "@/lib/toast-store";
+import { useAuthStore } from "@/runtime/stores/auth-store";
+import * as propertyRepo from "@/repos/property-repo";
+import { SEARCH_DEBOUNCE_MS, MAX_COMPARE_COUNT } from "@/config/constants";
 
 let _searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -122,12 +125,8 @@ export const useStore = create<AppState>((set, get) => ({
   dongList: [],
 
   loadDongList: async () => {
-    const { data } = await supabase
-      .from("properties")
-      .select("dong")
-      .eq("is_active", true);
-    if (data) {
-      const dongs = Array.from(new Set(data.map((r: { dong: string }) => r.dong).filter(Boolean))).sort();
+    const dongs = await propertyRepo.loadDongList();
+    if (dongs.length > 0) {
       set({ dongList: dongs });
     }
   },
@@ -136,113 +135,26 @@ export const useStore = create<AppState>((set, get) => ({
     set({ loading: true });
     try {
       const { filters, page, pageSize } = get();
+      const { data: rows, count } = await propertyRepo.loadProperties(filters, page, pageSize);
 
-      let query = supabase
-        .from("properties")
-        .select("*", { count: "exact" })
-        .eq("is_active", true);
+      // Map base properties from DB rows
+      const properties = rows.map(mapSupabaseToProperty);
 
-      // 동 필터
-      if (filters.dong.length > 0) {
-        query = query.in("dong", filters.dong);
-      }
-
-      // 유형 필터
-      if (filters.propertyType && filters.propertyType !== "전체") {
-        if (filters.propertyType === "건물") {
-          query = query.in("real_estate_type_name", ["건물", "상가건물"]);
-        } else {
-          query = query.eq("real_estate_type_name", filters.propertyType);
+      // Overlay user-specific meta (favorites, memos, listings)
+      const userId = useAuthStore.getState().userId;
+      if (userId && properties.length > 0) {
+        const ids = properties.map((p) => p.id);
+        const meta = await propertyRepo.getUserPropertyMeta(userId, ids);
+        for (const p of properties) {
+          if (meta.favorites.has(p.id)) p.isFavorite = true;
+          if (meta.memos.has(p.id)) p.memo = meta.memos.get(p.id);
+          if (meta.listings.has(p.id)) p.isMyListing = true;
         }
       }
 
-      // 거래 필터
-      if (filters.dealType && filters.dealType !== "전체") {
-        query = query.eq("trade_type_name", filters.dealType);
-      }
-
-      // 검색 (설명/주소)
-      if (filters.search) {
-        query = query.or(
-          `description.ilike.%${filters.search}%,address.ilike.%${filters.search}%,article_name.ilike.%${filters.search}%`
-        );
-      }
-
-      // 층 필터
-      if (filters.floorFilter && filters.floorFilter !== "전체") {
-        if (filters.floorFilter === "1층") {
-          query = query.like("floor_info", "1/%");
-        } else if (filters.floorFilter === "지하") {
-          query = query.or("floor_info.like.B%,floor_info.like.-%");
-        } else if (filters.floorFilter === "2층 이상") {
-          // floor_info is like "3/5", "12/15" etc. We need floor >= 2.
-          // Since Supabase doesn't support computed filters easily,
-          // we exclude 1st floor and basement, and require floor_info to exist.
-          query = query
-            .not("floor_info", "like", "1/%")
-            .not("floor_info", "like", "B%")
-            .not("floor_info", "like", "-%")
-            .not("floor_info", "is", null);
-        }
-      }
-
-      // 면적 필터
-      if (filters.areaMin > 0) {
-        query = query.gte("area2", filters.areaMin);
-      }
-      if (filters.areaMax > 0) {
-        query = query.lte("area2", filters.areaMax);
-      }
-
-      // 가격 필터 (DB는 원 단위, 필터는 만원 단위)
-      if (filters.priceMin > 0) {
-        query = query.gte("price", filters.priceMin * 10000);
-      }
-      if (filters.priceMax > 0) {
-        query = query.lte("price", filters.priceMax * 10000);
-      }
-
-      // 월세 필터
-      if (filters.rentMin > 0) {
-        query = query.gte("monthly_rent", filters.rentMin * 10000);
-      }
-      if (filters.rentMax > 0) {
-        query = query.lte("monthly_rent", filters.rentMax * 10000);
-      }
-
-      // 출처 필터
-      if (filters.source === "네이버") {
-        query = query.or("is_my_listing.eq.false,is_my_listing.is.null");
-      } else if (filters.source === "개인매물") {
-        query = query.eq("is_my_listing", true);
-      }
-
-      // 정렬
-      if (filters.sortBy === "price-asc") {
-        query = query.order("price", { ascending: true });
-      } else if (filters.sortBy === "price-desc") {
-        query = query.order("price", { ascending: false });
-      } else {
-        query = query.order("last_seen_at", { ascending: false });
-      }
-
-      // 페이지네이션
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
-      query = query.range(from, to);
-
-      const { data, error, count } = await query;
-
-      if (error) {
-        console.error("Supabase error:", error);
-        set({ loading: false });
-        return;
-      }
-
-      const properties = (data || []).map(mapSupabaseToProperty);
       set({
         properties,
-        totalCount: count || 0,
+        totalCount: count,
         loading: false,
       });
     } catch (e) {
@@ -255,7 +167,7 @@ export const useStore = create<AppState>((set, get) => ({
     set((s) => ({ filters: { ...s.filters, ...f }, page: 1 }));
     if ("search" in f && Object.keys(f).length === 1) {
       if (_searchDebounceTimer) clearTimeout(_searchDebounceTimer);
-      _searchDebounceTimer = setTimeout(() => get().loadProperties(), 300);
+      _searchDebounceTimer = setTimeout(() => get().loadProperties(), SEARCH_DEBOUNCE_MS);
     } else {
       get().loadProperties();
     }
@@ -279,18 +191,16 @@ export const useStore = create<AppState>((set, get) => ({
     const current = get().properties.find((p) => p.id === id);
     if (!current) return;
     const newFav = !current.isFavorite;
+    // Optimistic update
     set((s) => ({
       properties: s.properties.map((p) =>
         p.id === id ? { ...p, isFavorite: newFav } : p
       ),
     }));
-    supabase
-      .from("properties")
-      .update({ is_favorite: newFav })
-      .eq("id", id)
-      .then(({ error }) => {
-        if (error) console.error("Favorite sync error:", error);
-      });
+    const userId = useAuthStore.getState().userId;
+    if (userId) {
+      propertyRepo.toggleFavorite(userId, id, newFav);
+    }
   },
 
   selectProperty: (id) => set({ selectedPropertyId: id }),
@@ -299,7 +209,7 @@ export const useStore = create<AppState>((set, get) => ({
       const removing = s.compareIds.includes(id);
       const newIds = removing
         ? s.compareIds.filter((c) => c !== id)
-        : s.compareIds.length < 5 ? [...s.compareIds, id] : s.compareIds;
+        : s.compareIds.length < MAX_COMPARE_COUNT ? [...s.compareIds, id] : s.compareIds;
       const newCache = { ...s.compareCache };
       if (!removing) {
         const prop = s.properties.find((p) => p.id === id);
@@ -311,18 +221,17 @@ export const useStore = create<AppState>((set, get) => ({
     }),
   clearCompare: () => set({ compareIds: [], compareCache: {} }),
   saveMemo: (id, memo) => {
+    // Optimistic update
     set((s) => ({
       properties: s.properties.map((p) =>
         p.id === id ? { ...p, memo: memo || undefined } : p
       ),
     }));
-    supabase
-      .from("properties")
-      .update({ memo: memo || null })
-      .eq("id", id)
-      .then(({ error }) => {
-        if (error) console.error("Memo sync error:", error);
-        else useToastStore.getState().show("메모가 저장되었습니다");
-      });
+    const userId = useAuthStore.getState().userId;
+    if (userId) {
+      propertyRepo
+        .saveMemo(userId, id, memo)
+        .then(() => useToastStore.getState().show("메모가 저장되었습니다"));
+    }
   },
 }));

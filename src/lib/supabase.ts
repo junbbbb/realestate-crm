@@ -1,9 +1,8 @@
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+/**
+ * Re-export the canonical supabase client from config layer.
+ * Page files that still import from "@/lib/supabase" will keep working.
+ */
+export { supabase } from "@/config/supabase";
 
 export type SupabaseProperty = {
   id: string;

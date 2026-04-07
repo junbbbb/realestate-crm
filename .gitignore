@@ -51,3 +51,4 @@ screenshot-*.png
 
 # Cookies / secrets
 scripts/cookie.txt
+.env*.local

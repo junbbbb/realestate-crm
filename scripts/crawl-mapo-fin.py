@@ -29,6 +29,8 @@ HEADERS = {
 
 CLUSTERS_URL = "https://fin.land.naver.com/front-api/v1/article/map/articleClusters"
 ARTICLES_URL = "https://fin.land.naver.com/front-api/v1/article/clusteredArticles"
+BASIC_URL = "https://fin.land.naver.com/front-api/v1/article/basicInfo"
+AGENT_URL = "https://fin.land.naver.com/front-api/v1/article/agent"
 
 REGIONS = json.load(open("data/regions.json", encoding="utf-8"))["regionList"]
 
@@ -98,6 +100,29 @@ def fetch_articles(cluster_id, cortar_no, seed=None, last_info=None):
     if r.status_code != 200:
         return None
     return r.json()
+
+
+def fetch_detail(article_no, real_estate_type, trade_type):
+    """매물 상세 (basicInfo + agent) 조회"""
+    try:
+        basic_res = cf_requests.get(
+            f"{BASIC_URL}?articleNumber={article_no}&realEstateType={real_estate_type}&tradeType={trade_type}",
+            headers=HEADERS, impersonate="chrome", timeout=15,
+        )
+        time.sleep(0.2)
+        agent_res = cf_requests.get(
+            f"{AGENT_URL}?articleNumber={article_no}",
+            headers=HEADERS, impersonate="chrome", timeout=15,
+        )
+        basic = basic_res.json() if basic_res.status_code == 200 else {}
+        agent = agent_res.json() if agent_res.status_code == 200 else {}
+        return {
+            "basicInfo": basic.get("result") if basic.get("isSuccess") else None,
+            "agentInfo": agent.get("result") if agent.get("isSuccess") else None,
+        }
+    except Exception as e:
+        print(f"    상세 실패 ({article_no}): {e}")
+        return {"basicInfo": None, "agentInfo": None}
 
 
 def crawl_dong(region):
@@ -188,6 +213,34 @@ def main():
     print(f"\n\n=== 마포구 전체: {len(all_articles)}건 ===")
     for dong, cnt in sorted(summary.items(), key=lambda x: -x[1]):
         print(f"  {dong}: {cnt}건")
+
+    # 상세 조회 (basicInfo + agent)
+    print(f"\n=== 상세 조회 시작 ({len(all_articles)}건) ===")
+    detail_ok = 0
+    detail_fail = 0
+    for i, item in enumerate(all_articles):
+        info = item.get("representativeArticleInfo", item)
+        article_no = info.get("articleNumber", "")
+        re_type = info.get("realEstateType", "")
+        trade_type = info.get("tradeType", "")
+
+        if not article_no:
+            continue
+
+        detail = fetch_detail(article_no, re_type, trade_type)
+        item["_detail"] = detail
+
+        if detail.get("basicInfo"):
+            detail_ok += 1
+        else:
+            detail_fail += 1
+
+        if (i + 1) % 100 == 0:
+            print(f"  상세 {i+1}/{len(all_articles)} (성공={detail_ok}, 실패={detail_fail})")
+
+        time.sleep(0.1)
+
+    print(f"  상세 완료: 성공={detail_ok}, 실패={detail_fail}")
 
     os.makedirs("data", exist_ok=True)
     out = f"data/crawled-mapo-fin-{datetime.now().strftime('%Y-%m-%d')}.json"

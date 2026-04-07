@@ -65,7 +65,7 @@ curl_cffi를 사용해 Chrome TLS fingerprint를 흉내 (`impersonate="chrome"`)
 ## 4. 코드 사전
 
 ### realEstateTypes (매물 유형)
-| 코드 | 의미 | CRM 분류 |
+| 코드 | 네이버 분류 | CRM 매핑 |
 |---|---|---|
 | D01 | 사무실 | 사무실 |
 | D02 | 상가 / 상가점포 | 상가 |
@@ -75,10 +75,7 @@ curl_cffi를 사용해 Chrome TLS fingerprint를 흉내 (`impersonate="chrome"`)
 | E01 | 오피스 | 건물 |
 | Z00 | 기타 / 토지 | 건물 |
 
-> 위 7개 코드가 `crawl-mapo-fin.py`에서 사용하는 전체 세트.
-> fin.land UI에서 "상가·업무" 탭 선택 시 기본 전송되는 것은 D02, D03, D04, E01, Z00 5개이나,
-> D01(사무실)과 D05(상가주택)를 추가하여 7종 모두 수집한다.
-> 정확한 각 코드 의미는 네이버가 공식 문서를 내지 않아 경험적으로 추정.
+> 크롤링 시 7개 코드 전부 전송. CRM에서는 4개 유형(상가/건물/사무실/상가주택)으로 매핑.
 
 ### tradeTypes (거래 유형)
 | 코드 | 의미 |
@@ -109,7 +106,7 @@ curl_cffi를 사용해 Chrome TLS fingerprint를 흉내 (`impersonate="chrome"`)
 {
   "filter": {
     "tradeTypes": ["B1", "B2", "A1", "B3"],
-    "realEstateTypes": ["D01","D02","D03","D04","D05","E01","Z00"],
+    "realEstateTypes": ["D01", "D02", "D03", "D04", "D05", "E01", "Z00"],
     "roomCount": [],
     "bathRoomCount": [],
     "optionTypes": [],
@@ -192,7 +189,7 @@ curl_cffi를 사용해 Chrome TLS fingerprint를 흉내 (`impersonate="chrome"`)
   "clusterId": "16/55870/25381",
   "filter": {
     "tradeTypes": ["B1", "B2", "A1", "B3"],
-    "realEstateTypes": ["D01","D02","D03","D04","D05","E01","Z00"],
+    "realEstateTypes": ["D01", "D02", "D03", "D04", "D05", "E01", "Z00"],
     "roomCount": [],
     "bathRoomCount": [],
     "optionTypes": [],
@@ -364,7 +361,6 @@ curl_cffi를 사용해 Chrome TLS fingerprint를 흉내 (`impersonate="chrome"`)
 ## 10. 원본 cURL 샘플
 
 사용자가 직접 캡처한 요청 원형 (쿠키는 마스킹).
-> 아래 샘플은 초기 캡처본으로 5종(D02-D04, E01, Z00)만 포함. 실제 크롤러는 D01, D05를 추가한 7종을 사용한다.
 
 ```bash
 curl 'https://fin.land.naver.com/front-api/v1/article/clusteredArticles' \

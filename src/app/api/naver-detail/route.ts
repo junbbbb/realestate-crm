@@ -57,6 +57,8 @@ export async function GET(req: NextRequest) {
     });
   } catch (e: unknown) {
     const errMsg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: "fetch failed", detail: errMsg }, { status: 502 });
+    const cause = e instanceof Error && e.cause ? JSON.stringify(e.cause, Object.getOwnPropertyNames(e.cause as object)) : "none";
+    console.error("Naver detail fetch error:", errMsg, cause);
+    return NextResponse.json({ error: "fetch failed", detail: errMsg, cause }, { status: 502 });
   }
 }
