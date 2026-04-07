@@ -35,35 +35,36 @@ export interface NaverDetailInfo {
 const cache = new Map<string, { data: NaverDetailInfo; ts: number }>();
 const CACHE_TTL = 5 * 60 * 1000;
 
-const NAVER_BASE = "https://fin.land.naver.com/front-api/v1/article";
+const LOCAL_PROXY = "http://localhost:4000/naver-detail";
 
-async function fetchViaServer(articleNumber: string, realEstateType: string, tradeType: string) {
-  const url = `/api/naver-detail?articleNumber=${articleNumber}&realEstateType=${realEstateType}&tradeType=${tradeType}`;
+async function fetchViaLocalProxy(articleNumber: string, realEstateType: string, tradeType: string) {
+  const url = `${LOCAL_PROXY}?articleNumber=${articleNumber}&realEstateType=${realEstateType}&tradeType=${tradeType}`;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000); // 5초 timeout
+  const timeout = setTimeout(() => controller.abort(), 3000);
   try {
     const res = await fetch(url, { signal: controller.signal });
-    if (!res.ok) throw new Error(`server ${res.status}`);
+    if (!res.ok) throw new Error(`proxy ${res.status}`);
     const json = await res.json();
-    // 서버에서 데이터를 못 가져온 경우 (네이버 차단 등)
-    if (!json.basicInfo && !json.agentInfo) throw new Error("empty response");
+    if (!json.basicInfo && !json.agentInfo) throw new Error("empty");
     return json;
   } finally {
     clearTimeout(timeout);
   }
 }
 
-async function fetchDirectFromClient(articleNumber: string, realEstateType: string, tradeType: string) {
-  const [basicRes, agentRes] = await Promise.all([
-    fetch(`${NAVER_BASE}/basicInfo?articleNumber=${articleNumber}&realEstateType=${realEstateType}&tradeType=${tradeType}`),
-    fetch(`${NAVER_BASE}/agent?articleNumber=${articleNumber}`),
-  ]);
-  const basic = await basicRes.json();
-  const agent = await agentRes.json();
-  return {
-    basicInfo: basic.isSuccess ? basic.result : null,
-    agentInfo: agent.isSuccess ? agent.result : null,
-  };
+async function fetchViaServer(articleNumber: string, realEstateType: string, tradeType: string) {
+  const url = `/api/naver-detail?articleNumber=${articleNumber}&realEstateType=${realEstateType}&tradeType=${tradeType}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) throw new Error(`server ${res.status}`);
+    const json = await res.json();
+    if (!json.basicInfo && !json.agentInfo) throw new Error("empty response");
+    return json;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function fetchNaverDetail(
@@ -76,15 +77,14 @@ export async function fetchNaverDetail(
 
   let json;
   try {
-    // 1차: 서버 API route
-    json = await fetchViaServer(articleNumber, realEstateType, tradeType);
+    // 1차: 로컬 프록시 (한국 IP, CORS 우회)
+    json = await fetchViaLocalProxy(articleNumber, realEstateType, tradeType);
   } catch {
     try {
-      // 2차: 클라이언트 직접 호출 (CORS 테스트 모드)
-      json = await fetchDirectFromClient(articleNumber, realEstateType, tradeType);
-      console.log("[naver-detail] direct client fetch succeeded");
-    } catch (e) {
-      console.error("[naver-detail] both server and client fetch failed", e);
+      // 2차: 서버 API route (localhost에서는 동작)
+      json = await fetchViaServer(articleNumber, realEstateType, tradeType);
+    } catch {
+      // 둘 다 실패 — 상세 정보 없이 표시
       return null;
     }
   }
