@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCollectionStore } from "@/lib/collection-store";
+import { useAuthStore } from "@/runtime/stores/auth-store";
 import { AuthProvider } from "@/runtime/providers/auth-provider";
 import {
   LayoutDashboard,
@@ -32,15 +33,78 @@ const nav = [
 
 const mobileNav = nav.filter((n) => n.href !== "/my-listings");
 
+function OfficeName() {
+  const user = useAuthStore((s) => s.user);
+  const officeName = user?.user_metadata?.office_name;
+  if (!officeName) return null;
+  return <p className="text-xs text-sidebar-foreground/60 truncate">{officeName}</p>;
+}
+
+function OfficeNamePrompt() {
+  const user = useAuthStore((s) => s.user);
+  const userId = useAuthStore((s) => s.userId);
+  const [show, setShow] = useState(false);
+  const [name, setName] = useState("");
+
+  useEffect(() => {
+    if (user && !user.user_metadata?.office_name) {
+      setShow(true);
+    }
+  }, [user]);
+
+  if (!show) return null;
+
+  async function handleSave() {
+    if (!name.trim()) return;
+    const { createSupabaseBrowserClient } = await import("@/lib/supabase-auth");
+    const supabase = createSupabaseBrowserClient();
+    await supabase.auth.updateUser({ data: { office_name: name.trim() } });
+    // Refresh auth state
+    const { data: { user: updated } } = await supabase.auth.getUser();
+    if (updated) useAuthStore.getState().setAuth(updated.id, updated);
+    setShow(false);
+  }
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
+      <div className="bg-card border rounded-lg shadow-lg w-[340px] p-6 space-y-4">
+        <div className="text-center">
+          <img src="/logo.svg" alt="Best Mountain" className="h-12 mx-auto mb-2" />
+          <h2 className="text-lg font-bold" style={{ color: "#000000" }}>환영합니다!</h2>
+          <p className="text-sm text-muted-foreground mt-1">부동산 이름을 입력해주세요</p>
+        </div>
+        <input
+          autoFocus
+          placeholder="예: 베스트공인중개"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSave()}
+          className="w-full h-10 rounded-lg border px-3 text-sm outline-none focus:ring-1 focus:ring-[#000000]"
+        />
+        <button
+          onClick={handleSave}
+          disabled={!name.trim()}
+          className="w-full h-10 rounded-lg text-white font-medium disabled:opacity-40"
+          style={{ backgroundColor: "#3585B0" }}
+        >
+          시작하기
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ShellInner({ children }: { children: React.ReactNode }) {
   const loadCollections = useCollectionStore((s) => s.loadCollections);
 
   useEffect(() => {
-    // AuthProvider가 userId 세팅 완료 후에만 렌더되므로 안전
     loadCollections();
   }, [loadCollections]);
 
-  return <>{children}</>;
+  return <>
+    <OfficeNamePrompt />
+    {children}
+  </>;
 }
 
 export default function Shell({ children }: { children: React.ReactNode }) {
@@ -53,11 +117,15 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         {/* Sidebar: hidden on mobile, icon-only on md, full on xl+ */}
         <aside className="hidden md:flex shrink-0 bg-sidebar border-r border-sidebar-border flex-col w-14 xl:w-56 transition-all duration-200">
           <div className="p-3 xl:p-6">
-            <Link href="/" className="flex items-center gap-2.5 text-sidebar-foreground">
-              <div className="h-8 w-8 rounded-lg bg-foreground flex items-center justify-center shrink-0">
-                <span className="text-background text-lg font-black">B</span>
+            <Link href="/" className="text-sidebar-foreground">
+              <div className="hidden xl:flex flex-col items-center">
+                <img src="/logo.svg" alt="Best Mountain" className="h-10 object-contain mb-1" />
+                <span className="text-sm tracking-widest" style={{ color: "#000000", fontFamily: "'Black Han Sans', sans-serif" }}>BEST MOUNTAIN</span>
+                <OfficeName />
               </div>
-              <span className="hidden xl:block text-base font-extrabold tracking-tight">베스트공인중개</span>
+              <div className="xl:hidden flex items-center justify-center">
+                <img src="/logo.svg" alt="Best Mountain" className="h-8 w-8 object-contain" />
+              </div>
             </Link>
           </div>
           <nav className="flex-1 px-2 xl:px-3 space-y-1">

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { KeyRound } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-auth";
 
-const BRAND_COLOR = "#3585B0";
+const BRAND_COLOR = "#000000"; // 사이드바와 동일
 
 export default function LoginPage() {
   const [showPin, setShowPin] = useState(false);
@@ -40,8 +40,8 @@ export default function LoginPage() {
       <div className="w-[340px] space-y-8">
         {/* 로고 + 브랜드 */}
         <div className="text-center">
-          <img src="/logo.png" alt="Best Mountain" className="h-20 mx-auto mb-3" />
-          <h1 className="text-2xl font-extrabold tracking-widest" style={{ color: BRAND_COLOR }}>
+          <img src="/logo.svg" alt="Best Mountain" className="h-20 mx-auto mb-3" />
+          <h1 className="text-2xl tracking-widest" style={{ color: BRAND_COLOR, fontFamily: "'Black Han Sans', sans-serif" }}>
             BEST MOUNTAIN
           </h1>
           <p className="text-sm text-muted-foreground mt-3 italic leading-relaxed">
