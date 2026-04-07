@@ -44,10 +44,13 @@ export async function fetchNaverDetail(
   if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
 
   try {
-    const res = await fetch(
-      `/api/naver-detail?articleNumber=${articleNumber}&realEstateType=${realEstateType}&tradeType=${tradeType}`
-    );
-    if (!res.ok) return null;
+    const url = `/api/naver-detail?articleNumber=${articleNumber}&realEstateType=${realEstateType}&tradeType=${tradeType}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      console.error(`[naver-detail] ${res.status} ${url}`, text);
+      return null;
+    }
 
     const json = await res.json();
     const basic = json.basicInfo;

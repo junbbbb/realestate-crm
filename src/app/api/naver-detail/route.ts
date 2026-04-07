@@ -45,15 +45,32 @@ export async function GET(req: NextRequest) {
       fetch(`${BASE}/agent?articleNumber=${articleNumber}`, { headers }),
     ]);
 
-    const basic = await basicRes.json();
-    const agent = await agentRes.json();
+    const basicText = await basicRes.text();
+    const agentText = await agentRes.text();
+
+    let basic, agent;
+    try { basic = JSON.parse(basicText); } catch { basic = null; }
+    try { agent = JSON.parse(agentText); } catch { agent = null; }
+
+    if (!basic?.isSuccess) {
+      console.error(`[naver-detail] basicInfo failed: status=${basicRes.status}`, basicText.slice(0, 200));
+    }
+    if (!agent?.isSuccess) {
+      console.error(`[naver-detail] agent failed: status=${agentRes.status}`, agentText.slice(0, 200));
+    }
 
     return NextResponse.json({
-      basicInfo: basic.isSuccess ? basic.result : null,
-      agentInfo: agent.isSuccess ? agent.result : null,
+      basicInfo: basic?.isSuccess ? basic.result : null,
+      agentInfo: agent?.isSuccess ? agent.result : null,
+      _debug: {
+        basicStatus: basicRes.status,
+        agentStatus: agentRes.status,
+        cookieLen: NAVER_COOKIE.length,
+        region: process.env.VERCEL_REGION || "local",
+      },
     });
   } catch (e) {
     console.error("Naver detail fetch error:", e);
-    return NextResponse.json({ error: "fetch failed" }, { status: 502 });
+    return NextResponse.json({ error: "fetch failed", detail: String(e) }, { status: 502 });
   }
 }
