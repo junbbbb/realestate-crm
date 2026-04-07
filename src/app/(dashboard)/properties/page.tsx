@@ -174,6 +174,7 @@ export function DetailPanel({ property, onClose, onMemoSaved }: { property: Prop
   const { customers } = useCustomerStore();
   const [showDealModal, setShowDealModal] = useState(false);
   const [showDealCreated, setShowDealCreated] = useState(false);
+  const [createdDealId, setCreatedDealId] = useState<string | null>(null);
   const [showDeleteMyListing, setShowDeleteMyListing] = useState(false);
   const loadProperties = useStore((s) => s.loadProperties);
   const router = useRouter();
@@ -293,13 +294,14 @@ export function DetailPanel({ property, onClose, onMemoSaved }: { property: Prop
               sellers={sellers}
               buyers={buyers}
               onConfirm={async (sellerId, buyerId) => {
-                await addDeal({
+                const dealId = await addDeal({
                   propertyId: property.id,
                   dealType: property.dealType,
                   sellerId: sellerId || undefined,
                   buyerId: buyerId || undefined,
                 });
                 setShowDealModal(false);
+                setCreatedDealId(dealId);
                 setShowDealCreated(true);
               }}
               onClose={() => setShowDealModal(false)}
@@ -314,7 +316,7 @@ export function DetailPanel({ property, onClose, onMemoSaved }: { property: Prop
               <p className="text-xs text-muted-foreground">해당 거래로 이동하시겠습니까?</p>
               <div className="flex gap-2 justify-end">
                 <Button size="sm" variant="outline" onClick={() => setShowDealCreated(false)}>여기서 계속</Button>
-                <Button size="sm" onClick={() => { setShowDealCreated(false); router.push("/my-listings"); }}>거래 관리로 이동</Button>
+                <Button size="sm" onClick={() => { setShowDealCreated(false); router.push(createdDealId ? `/my-listings?deal=${createdDealId}` : "/my-listings"); }}>거래 관리로 이동</Button>
               </div>
             </div>
           </div>
