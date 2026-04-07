@@ -30,14 +30,18 @@ export async function loadProperties(
 
     // 탭별 개인매물 필터링
     if (filters.source === "네이버") {
-      // 네이버 탭: 개인매물 전부 숨김 (네이버 크롤링 데이터만)
       query = query.or("is_my_listing.neq.true,is_my_listing.is.null");
     } else if (filters.source !== "개인매물") {
-      // 전체 탭: 네이버 매물 + 내 개인매물만 (남의 개인매물 숨김)
-      if (myListingIds.size > 0) {
-        query = query.or(`is_my_listing.neq.true,is_my_listing.is.null,id.in.(${[...myListingIds].join(",")})`);
-      } else {
-        query = query.or("is_my_listing.neq.true,is_my_listing.is.null");
+      // 전체 탭: 남의 개인매물만 제외 (내 개인매물은 보여야 함)
+      // 남의 개인매물 ID 목록 구하기
+      const { data: allPersonal } = await supabase
+        .from("properties")
+        .select("id")
+        .eq("is_my_listing", true);
+      const allPersonalIds = new Set((allPersonal || []).map((r: { id: string }) => r.id));
+      const othersIds = [...allPersonalIds].filter((id) => !myListingIds.has(id));
+      if (othersIds.length > 0) {
+        query = query.not("id", "in", `(${othersIds.map(id => `"${id}"`).join(",")})`);
       }
     }
 
@@ -132,7 +136,7 @@ export async function loadProperties(
     const { data, error, count } = await query;
 
     if (error) {
-      console.error("loadProperties error:", error);
+      console.error("loadProperties error:", error.message, error.code, error.details, error.hint);
       return { data: [], count: 0 };
     }
 
