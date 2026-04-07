@@ -69,8 +69,15 @@ export async function GET(req: NextRequest) {
         region: process.env.VERCEL_REGION || "local",
       },
     });
-  } catch (e) {
-    console.error("Naver detail fetch error:", e);
-    return NextResponse.json({ error: "fetch failed", detail: String(e) }, { status: 502 });
+  } catch (e: unknown) {
+    const err = e as { message?: string; cause?: unknown };
+    const errMsg = err.message ? `${err.message} | cause: ${String(err.cause ?? "")}` : String(e);
+    console.error("Naver detail fetch error:", errMsg);
+    return NextResponse.json({
+      error: "fetch failed",
+      detail: errMsg,
+      region: process.env.VERCEL_REGION || "local",
+      cookieLen: NAVER_COOKIE.length,
+    }, { status: 502 });
   }
 }
