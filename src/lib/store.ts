@@ -73,7 +73,7 @@ function buildAreaLabel(row: SupabaseProperty): { area: number; label: string } 
   return { area: a, label: `${a}m²` };
 }
 
-function mapSupabaseToProperty(row: SupabaseProperty): Property {
+export function mapSupabaseToProperty(row: SupabaseProperty): Property {
   const floorParts = row.floor_info?.split("/") || [];
   const floor = floorParts[0] ? parseInt(floorParts[0].replace(/\D/g, "")) || undefined : undefined;
   const totalFloors = floorParts[1] ? parseInt(floorParts[1].replace(/\D/g, "")) || undefined : undefined;

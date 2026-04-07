@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { formatMoney, formatPrice } from "@/lib/format";
 import { Building2, Heart, FolderOpen, Users, TrendingUp, TrendingDown, MapPin, Bookmark, Clock, ArrowUpRight, ArrowDownRight, X } from "lucide-react";
 import { DetailPanel } from "@/app/(dashboard)/properties/page";
+import { mapSupabaseToProperty } from "@/lib/store";
 import { Property } from "@/types";
 
 export default function Dashboard() {
@@ -23,6 +24,13 @@ export default function Dashboard() {
   const myListings = useMemo(() => properties.filter((p) => p.isMyListing), [properties]);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [priceChangesLoading, setPriceChangesLoading] = useState(true);
+
+  const openProperty = async (id: string) => {
+    const local = properties.find((p) => p.id === id);
+    if (local) { setSelectedProperty(local); return; }
+    const { data } = await supabase.from("properties").select("*").eq("id", id).single();
+    if (data) setSelectedProperty(mapSupabaseToProperty(data));
+  };
 
   // 가격 변동 매물
   const [priceChanges, setPriceChanges] = useState<{
@@ -176,7 +184,7 @@ export default function Dashboard() {
         const renderList = (items: typeof priceChanges, isUp: boolean) => (
           <div className="space-y-1">
             {items.map((c) => (
-              <div key={c.articleNo} className="flex items-center justify-between py-1.5 border-b border-border last:border-0 cursor-pointer hover:bg-secondary/50 rounded-md px-1 -mx-1 transition-colors" onClick={() => { const p = properties.find((pr) => pr.id === c.articleNo); if (p) setSelectedProperty(p); }}>
+              <div key={c.articleNo} className="flex items-center justify-between py-1.5 border-b border-border last:border-0 cursor-pointer hover:bg-secondary/50 rounded-md px-1 -mx-1 transition-colors" onClick={() => openProperty(c.articleNo)}>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium truncate">{c.title || c.articleNo}</p>
                   <p className="text-[11px] text-muted-foreground">{c.propertyType} · {c.dealType}</p>
@@ -224,7 +232,7 @@ export default function Dashboard() {
           </div>
           <div className="space-y-3">
             {properties.slice(0, 5).map((p) => (
-              <div key={p.id} className="flex items-center justify-between cursor-pointer hover:bg-secondary/50 rounded-md px-1 -mx-1 py-0.5 transition-colors" onClick={() => setSelectedProperty(p)}>
+              <div key={p.id} className="flex items-center justify-between cursor-pointer hover:bg-secondary/50 rounded-md px-1 -mx-1 py-0.5 transition-colors" onClick={() => openProperty(p.id)}>
                 <div className="flex items-center gap-2 min-w-0 text-sm">
                   <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <span className="truncate font-medium">{p.title}</span>
@@ -250,7 +258,7 @@ export default function Dashboard() {
                 const time = new Date(s.addedAt);
                 const timeStr = `${(time.getMonth() + 1).toString().padStart(2, "0")}.${time.getDate().toString().padStart(2, "0")} ${time.getHours().toString().padStart(2, "0")}:${time.getMinutes().toString().padStart(2, "0")}`;
                 return (
-                  <div key={`${s.propertyId}-${i}`} className="flex items-start gap-3 cursor-pointer hover:bg-secondary/50 rounded-md px-1 -mx-1 py-0.5 transition-colors" onClick={() => { if (p) setSelectedProperty(p); }}>
+                  <div key={`${s.propertyId}-${i}`} className="flex items-start gap-3 cursor-pointer hover:bg-secondary/50 rounded-md px-1 -mx-1 py-0.5 transition-colors" onClick={() => { if (p) openProperty(p.id); }}>
                     <div className="mt-0.5 h-8 w-8 rounded-lg bg-secondary flex items-center justify-center shrink-0">
                       <Building2 className="h-4 w-4 text-muted-foreground" />
                     </div>
