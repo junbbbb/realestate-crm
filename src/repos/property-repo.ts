@@ -12,25 +12,14 @@ export async function loadProperties(
   userId?: string | null
 ): Promise<{ data: SupabaseProperty[]; count: number }> {
   try {
-    // 다른 유저의 개인매물 ID를 미리 가져와서 제외
-    let excludeIds: string[] = [];
-    if (userId && filters.source !== "개인매물") {
-      // is_my_listing=true인 전체 매물 중 내 것(user_listings)이 아닌 것을 제외
-      const { data: allMyListings } = await supabase
-        .from("properties")
-        .select("id")
-        .eq("is_my_listing", true);
-      const allListingIds = new Set((allMyListings || []).map((r: { id: string }) => r.id));
-
-      if (allListingIds.size > 0) {
-        const { data: myListings } = await supabase
-          .from("user_listings")
-          .select("property_id")
-          .eq("user_id", userId);
-        const myListingIds = new Set((myListings || []).map((r: { property_id: string }) => r.property_id));
-
-        excludeIds = [...allListingIds].filter((id) => !myListingIds.has(id));
-      }
+    // 내 개인매물 ID 가져오기 (user_listings 테이블)
+    let myListingIds = new Set<string>();
+    if (userId) {
+      const { data: myListings } = await supabase
+        .from("user_listings")
+        .select("property_id")
+        .eq("user_id", userId);
+      myListingIds = new Set((myListings || []).map((r: { property_id: string }) => r.property_id));
     }
 
     let query = supabase
@@ -38,9 +27,16 @@ export async function loadProperties(
       .select("*", { count: "exact" })
       .eq("is_active", true);
 
-    // 다른 유저의 개인매물 제외
-    if (excludeIds.length > 0) {
-      query = query.not("id", "in", `(${excludeIds.join(",")})`);
+    // 전체/네이버 탭: 남의 개인매물 숨기기 (is_my_listing=true인데 내 것 아닌 거)
+    if (filters.source !== "개인매물") {
+      // 네이버 매물(is_my_listing != true) + 내 개인매물만 표시
+      if (myListingIds.size > 0) {
+        // is_my_listing이 false/null이거나, 내 매물인 것만
+        query = query.or(`is_my_listing.neq.true,is_my_listing.is.null,id.in.(${[...myListingIds].join(",")})`);
+      } else {
+        // 내 개인매물 없으면 전체 개인매물 숨기기
+        query = query.or("is_my_listing.neq.true,is_my_listing.is.null");
+      }
     }
 
     // dong filter
@@ -108,26 +104,12 @@ export async function loadProperties(
       query = query.lte("monthly_rent", filters.rentMax * 10000);
     }
 
-    // source filter — 개인매물은 user_listings 테이블에서 ID 가져와서 필터
-    if (filters.source === "개인매물" && userId) {
-      const { data: listings } = await supabase
-        .from("user_listings")
-        .select("property_id")
-        .eq("user_id", userId);
-      const listingIds = (listings || []).map((r: { property_id: string }) => r.property_id);
-      if (listingIds.length > 0) {
-        query = query.in("id", listingIds);
+    // source filter — "개인매물" 탭: 내 것만
+    if (filters.source === "개인매물") {
+      if (myListingIds.size > 0) {
+        query = query.in("id", [...myListingIds]);
       } else {
         return { data: [], count: 0 };
-      }
-    } else if (filters.source === "네이버" && userId) {
-      const { data: listings } = await supabase
-        .from("user_listings")
-        .select("property_id")
-        .eq("user_id", userId);
-      const listingIds = (listings || []).map((r: { property_id: string }) => r.property_id);
-      if (listingIds.length > 0) {
-        query = query.not("id", "in", `(${listingIds.join(",")})`);
       }
     }
 
