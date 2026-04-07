@@ -55,6 +55,25 @@ function PriceHistoryPanel({ articleNo }: { articleNo: string }) {
   );
 }
 
+const CACHE_KEY = "dashboard_price_changes";
+const CACHE_TTL = 60 * 60 * 1000; // 1시간
+
+function getCachedPriceChanges() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    if (Date.now() - ts > CACHE_TTL) return null;
+    return data;
+  } catch { return null; }
+}
+
+function setCachedPriceChanges(data: unknown) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
+  } catch {}
+}
+
 export default function Dashboard() {
   const properties = useStore((s) => s.properties);
   const totalCount = useStore((s) => s.totalCount);
@@ -92,6 +111,14 @@ export default function Dashboard() {
 
   useEffect(() => {
     (async () => {
+      // 캐시 확인
+      const cached = getCachedPriceChanges();
+      if (cached) {
+        setPriceChanges(cached);
+        setPriceChangesLoading(false);
+        return;
+      }
+
       // 최근 7일 가격 변동 (increase/decrease)
       const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const { data: history } = await supabase
@@ -162,6 +189,7 @@ export default function Dashboard() {
         return Math.abs(b.rate) - Math.abs(a.rate);
       });
       setPriceChanges(changes);
+      setCachedPriceChanges(changes);
       setPriceChangesLoading(false);
     })();
   }, []);
