@@ -75,7 +75,11 @@ function PriceHistoryPanel({ articleNo }: { articleNo: string }) {
 
 export default function Dashboard() {
   const properties = useStore((s) => s.properties);
-  const totalCount = useStore((s) => s.totalCount);
+  const [realTotalCount, setRealTotalCount] = useState(0);
+  useEffect(() => {
+    supabase.from("properties").select("*", { count: "exact", head: true }).eq("is_active", true)
+      .then(({ count }) => { if (count != null) setRealTotalCount(count); });
+  }, []);
   const loadProperties = useStore((s) => s.loadProperties);
   const collections = useCollectionStore((s) => s.collections);
 
@@ -144,7 +148,7 @@ export default function Dashboard() {
   }, [collections]);
 
   const stats = [
-    { label: "마포구 전체매물", value: totalCount, unit: "건", icon: Building2 },
+    { label: "마포구 전체매물", value: realTotalCount, unit: "건", icon: Building2 },
     { label: "컬렉션", value: collections.length, unit: "개", icon: Bookmark },
     { label: "내 매물", value: myListings.length, unit: "건", icon: FolderOpen },
     { label: "고객", value: 0, unit: "명", icon: Users },
