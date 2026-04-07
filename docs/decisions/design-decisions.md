@@ -1,4 +1,4 @@
-# 설계 결정 기록
+# 설계 결정 기록 — BEST MOUNTAIN
 
 ## 2026-04-06
 
@@ -144,3 +144,39 @@ properties ←─ deals ──→ customers
 - 인메모리 캐시(5분)는 페이지 새로고침 시 소실
 - DB 캐시(24시간)로 프록시 호출 최소화
 - DB 레벨 자동 삭제는 미구현이나 `fetched_at` 인덱스가 존재하여 향후 확률적 정리 또는 cron 추가 가능
+
+### 16. 멀티유저: Google OAuth + PIN fallback
+
+**결정**: Supabase Auth (Google OAuth)를 메인 인증으로, 기존 PIN을 fallback으로 유지
+
+**이유**:
+- 단일 사용자 -> 멀티유저 전환 필요
+- Google OAuth가 가장 간편 (비개발자 대상)
+- 기존 PIN 데이터(컬렉션, 고객, 거래) 보존 필요 -> PIN_USER_ID 고정 UUID 유지
+- RLS로 유저별 데이터 격리
+
+**구조**:
+- `auth-provider.tsx`: getSession() -> Google 유저면 uid, 아니면 PIN_USER_ID
+- `user_memos`, `user_favorites`, `user_listings` 분리 테이블: 기존 properties 플래그에서 유저별 테이블로
+- RLS 정책: `auth.uid() = user_id OR (auth.uid() IS NULL AND user_id = PIN_UUID)`
+
+### 17. 브랜드: BEST MOUNTAIN
+
+**결정**: "부동산 매물 관리 CRM" -> "BEST MOUNTAIN" 브랜딩
+
+**구현**:
+- 로고: `/public/logo.svg` (산 아이콘)
+- 로고 폰트: Montserrat 900, tracking-wider
+- 사이드바 + 로그인 화면에 적용
+- 첫 로그인 시 중개소 이름 입력 프롬프트 (user_metadata.office_name)
+
+### 18. 유저별 데이터 분리: 테이블 vs 플래그
+
+**결정**: 즐겨찾기/내매물을 properties 플래그에서 별도 user_* 테이블로 분리
+
+**이유**:
+- 기존: `properties.is_favorite`, `properties.is_my_listing` -- 단일 사용자 전용
+- 멀티유저에서는 유저마다 다른 즐겨찾기/내매물 필요
+- `user_favorites(user_id, property_id)`, `user_listings(user_id, property_id)` PK 조합
+- 메모도 `user_memos(user_id, property_id)` UNIQUE로 유저별 분리
+- properties의 기존 플래그는 하위 호환용으로 유지

@@ -1,7 +1,7 @@
-# 네이버 부동산 fin.land API 명세
+# 네이버 부동산 fin.land API 명세 — BEST MOUNTAIN
 
 네이버 부동산 크롤링에 사용하는 비공식 API 구조 정리.
-출처: 사용자가 fin.land.naver.com 로그인 후 브라우저 DevTools → Network → Copy as cURL로 캡처한 실제 요청.
+출처: fin.land.naver.com 로그인 후 브라우저 DevTools -> Network -> Copy as cURL로 캡처한 실제 요청.
 
 ⚠️ **비공식 API**. 파라미터/응답 구조가 바뀔 수 있음.
 

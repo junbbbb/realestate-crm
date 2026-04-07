@@ -1,6 +1,7 @@
-# 크롤링 검색 조건
+# 크롤링 검색 조건 — BEST MOUNTAIN
 
 현재 `scripts/crawl-mapo-fin.py`와 `scripts/crawl-fin-api.py`에서 사용하는 fin.land API 검색 필터 전체 정리.
+7개 매물 유형 (D01-D05, E01, Z00) x 4개 거래 유형 (A1, B1, B2, B3) = 마포구 26개 동 전체.
 
 관련 파일: `scripts/crawl-mapo-fin.py` (make_filter 함수), `scripts/crawl-fin-api.py` (FILTER_BASE 상수)
 
