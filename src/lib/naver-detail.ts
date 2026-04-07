@@ -35,6 +35,28 @@ export interface NaverDetailInfo {
 const cache = new Map<string, { data: NaverDetailInfo; ts: number }>();
 const CACHE_TTL = 5 * 60 * 1000;
 
+const NAVER_BASE = "https://fin.land.naver.com/front-api/v1/article";
+
+async function fetchViaServer(articleNumber: string, realEstateType: string, tradeType: string) {
+  const url = `/api/naver-detail?articleNumber=${articleNumber}&realEstateType=${realEstateType}&tradeType=${tradeType}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`server ${res.status}`);
+  return res.json();
+}
+
+async function fetchDirectFromClient(articleNumber: string, realEstateType: string, tradeType: string) {
+  const [basicRes, agentRes] = await Promise.all([
+    fetch(`${NAVER_BASE}/basicInfo?articleNumber=${articleNumber}&realEstateType=${realEstateType}&tradeType=${tradeType}`),
+    fetch(`${NAVER_BASE}/agent?articleNumber=${articleNumber}`),
+  ]);
+  const basic = await basicRes.json();
+  const agent = await agentRes.json();
+  return {
+    basicInfo: basic.isSuccess ? basic.result : null,
+    agentInfo: agent.isSuccess ? agent.result : null,
+  };
+}
+
 export async function fetchNaverDetail(
   articleNumber: string,
   realEstateType: string,
@@ -43,16 +65,22 @@ export async function fetchNaverDetail(
   const cached = cache.get(articleNumber);
   if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
 
+  let json;
   try {
-    const url = `/api/naver-detail?articleNumber=${articleNumber}&realEstateType=${realEstateType}&tradeType=${tradeType}`;
-    const res = await fetch(url);
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      console.error(`[naver-detail] ${res.status} ${url}`, text);
+    // 1차: 서버 API route
+    json = await fetchViaServer(articleNumber, realEstateType, tradeType);
+  } catch {
+    try {
+      // 2차: 클라이언트 직접 호출 (CORS 테스트 모드)
+      json = await fetchDirectFromClient(articleNumber, realEstateType, tradeType);
+      console.log("[naver-detail] direct client fetch succeeded");
+    } catch (e) {
+      console.error("[naver-detail] both server and client fetch failed", e);
       return null;
     }
+  }
 
-    const json = await res.json();
+  try {
     const basic = json.basicInfo;
     const agent = json.agentInfo;
 
