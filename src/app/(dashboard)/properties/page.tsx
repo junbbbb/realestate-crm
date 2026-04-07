@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { useScrollReveal } from "@/hooks/use-scroll-reveal";
 import { formatPrice, formatMoney } from "@/lib/format";
@@ -938,6 +938,13 @@ export default function Properties() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  // 필터/페이지/검색 변경 시 테이블 스크롤 맨 위로
+  useEffect(() => {
+    tableContainerRef.current?.scrollTo(0, 0);
+  }, [properties, page]);
+
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const compareCache = useStore((s) => s.compareCache);
   const selectedProperty = selectedId ? properties.find((p) => p.id === selectedId) : null;
@@ -1137,7 +1144,7 @@ export default function Properties() {
               <p className="font-medium">검색 결과가 없습니다</p>
             </div>
           ) : (
-            <div className="bg-card rounded-lg border overflow-auto flex-1 relative">
+            <div ref={tableContainerRef} className="bg-card rounded-lg border overflow-auto flex-1 relative">
               {loading && (
                 <div className="absolute inset-0 bg-card/60 z-20 flex items-center justify-center">
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
