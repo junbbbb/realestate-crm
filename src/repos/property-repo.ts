@@ -146,36 +146,17 @@ export async function loadProperties(
 // ---------------------------------------------------------------------------
 // Load distinct dong list
 // ---------------------------------------------------------------------------
+// 마포구 26개 동 — 고정 상수 (DB 조회 불필요)
+// 정합성: 크롤링 시 regions.json과 DB distinct dong 비교로 검증
+const MAPO_DONGS = [
+  "공덕동", "구수동", "노고산동", "당인동", "대흥동", "도화동", "동교동",
+  "마포동", "망원동", "상수동", "상암동", "서교동", "성산동", "신공덕동",
+  "신수동", "신정동", "아현동", "연남동", "염리동", "용강동", "중동",
+  "창전동", "토정동", "하중동", "합정동", "현석동",
+];
+
 export async function loadDongList(): Promise<string[]> {
-  // Supabase 기본 1000행 제한 우회: 페이지네이션으로 전체 dong 수집
-  const allDongs = new Set<string>();
-  let from = 0;
-  const batchSize = 1000;
-
-  while (true) {
-    const { data, error } = await supabase
-      .from("properties")
-      .select("dong")
-      .eq("is_active", true)
-      .range(from, from + batchSize - 1);
-
-    if (error) {
-      console.error("loadDongList error:", error);
-      break;
-    }
-
-    if (!data || data.length === 0) break;
-
-    for (const r of data) {
-      if (r.dong) allDongs.add(r.dong as string);
-    }
-
-    // 모든 dong을 찾았으면 (26개 동) 더 가져올 필요 없음
-    if (allDongs.size >= 26 || data.length < batchSize) break;
-    from += batchSize;
-  }
-
-  return [...allDongs].sort();
+  return MAPO_DONGS;
 }
 
 // ---------------------------------------------------------------------------
