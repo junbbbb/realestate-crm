@@ -40,14 +40,9 @@ export default function LoginPage() {
       <div className="w-[340px] space-y-8">
         {/* 로고 + 브랜드 */}
         <div className="text-center">
-          <div
-            className="h-16 w-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
-            style={{ backgroundColor: BRAND_COLOR }}
-          >
-            <span className="text-white text-2xl font-black tracking-tight">BM</span>
-          </div>
-          <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: BRAND_COLOR }}>
-            BLUEMOUNTAIN
+          <img src="/logo.png" alt="Best Mountain" className="h-20 mx-auto mb-3" />
+          <h1 className="text-2xl font-extrabold tracking-widest" style={{ color: BRAND_COLOR }}>
+            BEST MOUNTAIN
           </h1>
           <p className="text-sm text-muted-foreground mt-3 italic leading-relaxed">
             "충분히 많은 사람의 꿈을 이뤄주면,<br />네 꿈은 저절로 이뤄진다."
