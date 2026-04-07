@@ -16,11 +16,13 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - Zustand 5.0.12 (Client State)
 - Supabase (PostgreSQL + RLS)
 - lz-string (네이버 지도 layer 인코딩)
-- Python curl_cffi (크롤링)
+- Python curl_cffi (크롤링 + 네이버 API 프록시, Chrome TLS 지문 위장)
+- Decodo 프록시 (gate.decodo.com:10001, 한국 주거 IP — Vercel 해외 서버에서 네이버 접근용)
 
 ## Directory Structure
 - `src/app/(dashboard)/` — 대시보드, 매물목록, 저장매물, 거래관리, 고객, 설정
-- `src/app/api/naver-detail/` — 네이버 상세 API 프록시
+- `api/` — Vercel Python runtime (naver-proxy.py: curl_cffi + Decodo 프록시)
+- `src/app/api/naver-detail/` — 네이버 상세 API 프록시 (Next.js fallback)
 - `src/components/ui/` — shadcn/ui 컴포넌트
 - `src/components/` — naver-map, toast, collection-popup
 - `src/lib/` — store, collection-store, customer-store, deal-store, settings-store, toast-store, format, naver-detail, supabase
@@ -36,6 +38,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - `collections` — 저장 폴더 (소프트삭제)
 - `price_history` — 가격 변동 추적
 - `crawl_logs` — 크롤링 로그
+- `naver_detail_cache` — 네이버 상세 API 응답 DB 캐시 (인메모리 5분 + DB 24시간 TTL)
+- `price_change_rankings` — 가격 변동 TOP 6 상승/하락 (sync 시 사전 계산, 대시보드용)
 
 ## 핵심 문서
 - `docs/PROJECT_STATUS.md` — 프로젝트 전체 현황, DB 구조, 데이터 흐름

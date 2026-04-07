@@ -116,9 +116,13 @@ properties ←─ deals ──→ customers
 - Decodo: 한국 주거 IP 프록시 → 해외 서버(Vercel)에서도 한국 접속으로 인식
 - Vercel Python runtime에서 curl_cffi 구동 가능 확인 완료
 
-**대안 검토**:
+**대안 검토 (시도 순서)**:
+- Vercel 직접 fetch: 해외 IP + TLS 지문 → 403/429 즉시 차단
+- Oracle Cloud 한국 리전 VM: 데이터센터 IP 대역 → 봇으로 분류, 차단
+- Bright Data 주거 프록시: IP는 통과하나 rate limit 공격적 (429)
+- Decodo + Python requests: 프록시 IP 통과, TLS 지문이 Python → 403
 - Playwright/Puppeteer: Vercel serverless에서 바이너리 크기 초과
-- 일반 프록시: TLS 지문 문제 해결 안 됨
+- **최종**: Decodo + curl_cffi impersonate="chrome" → 한국 주거 IP + Chrome TLS 지문 = 성공
 
 ### 14. 사전 계산 랭킹 테이블 (price_change_rankings)
 
@@ -139,4 +143,4 @@ properties ←─ deals ──→ customers
 - 같은 매물 상세를 여러 번 조회하는 패턴 (목록↔상세 왕복)
 - 인메모리 캐시(5분)는 페이지 새로고침 시 소실
 - DB 캐시(24시간)로 프록시 호출 최소화
-- 5% 확률 정리로 오래된 캐시 자동 삭제 (별도 cron 불필요)
+- DB 레벨 자동 삭제는 미구현이나 `fetched_at` 인덱스가 존재하여 향후 확률적 정리 또는 cron 추가 가능
