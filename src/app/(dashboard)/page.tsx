@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { useCollectionStore } from "@/lib/collection-store";
+import { supabase } from "@/lib/supabase";
 import { formatMoney, formatPrice } from "@/lib/format";
-import { Building2, Heart, FolderOpen, Users, TrendingUp, MapPin, Bookmark, Clock } from "lucide-react";
+import { Building2, Heart, FolderOpen, Users, TrendingUp, TrendingDown, MapPin, Bookmark, Clock, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 export default function Dashboard() {
   const properties = useStore((s) => s.properties);
@@ -18,6 +19,87 @@ export default function Dashboard() {
 
   const favorites = useMemo(() => properties.filter((p) => p.isFavorite), [properties]);
   const myListings = useMemo(() => properties.filter((p) => p.isMyListing), [properties]);
+
+  // 가격 변동 매물
+  const [priceChanges, setPriceChanges] = useState<{
+    articleNo: string;
+    changeType: string;
+    price: number;
+    prevPrice: number;
+    rate: number;
+    recordedAt: string;
+    title?: string;
+    propertyType?: string;
+    dealType?: string;
+  }[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      // 최근 7일 가격 변동 (increase/decrease)
+      const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: history } = await supabase
+        .from("price_history")
+        .select("article_no, change_type, price, recorded_at")
+        .in("change_type", ["increase", "decrease"])
+        .gte("recorded_at", cutoff)
+        .order("recorded_at", { ascending: false })
+        .limit(200);
+
+      if (!history || history.length === 0) { setPriceChanges([]); return; }
+
+      // 이전 가격 조회를 위해 article_no별로 그룹핑
+      const articleIds = [...new Set(history.map((h) => h.article_no))];
+
+      // 매물 정보 조회
+      const { data: props } = await supabase
+        .from("properties")
+        .select("id, article_no, property_type, trade_type, deal_or_warrant_price")
+        .in("id", articleIds);
+
+      const propMap = new Map((props || []).map((p) => [p.id, p]));
+
+      // 각 변동 건에 대해 이전 가격 조회
+      const changes = [];
+      const seen = new Set<string>();
+      for (const h of history) {
+        if (seen.has(h.article_no)) continue;
+        seen.add(h.article_no);
+
+        // 이전 가격: 해당 건 바로 이전 기록
+        const { data: prev } = await supabase
+          .from("price_history")
+          .select("price")
+          .eq("article_no", h.article_no)
+          .lt("recorded_at", h.recorded_at)
+          .order("recorded_at", { ascending: false })
+          .limit(1);
+
+        const prevPrice = prev?.[0]?.price ?? 0;
+        const rate = prevPrice > 0 ? ((h.price - prevPrice) / prevPrice) * 100 : 0;
+        const prop = propMap.get(h.article_no);
+
+        const tradeMap: Record<string, string> = { A1: "매매", B1: "전세", B2: "월세", B3: "단기" };
+
+        changes.push({
+          articleNo: h.article_no,
+          changeType: h.change_type,
+          price: h.price,
+          prevPrice,
+          rate,
+          recordedAt: h.recorded_at,
+          title: prop?.deal_or_warrant_price,
+          propertyType: prop?.property_type,
+          dealType: tradeMap[prop?.trade_type] ?? prop?.trade_type,
+        });
+
+        if (changes.length >= 10) break;
+      }
+
+      // 상승률 높은 순 정렬
+      changes.sort((a, b) => Math.abs(b.rate) - Math.abs(a.rate));
+      setPriceChanges(changes);
+    })();
+  }, []);
 
   // 최근 저장된 매물 (컬렉션 entries에서 최신 5개)
   const recentSaved = useMemo(() => {
@@ -56,6 +138,44 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      {/* 가격 변동 */}
+      {priceChanges.length > 0 && (
+        <div className="bg-card rounded-lg p-6">
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-4">
+            <TrendingUp className="h-4 w-4" />
+            최근 7일 가격 변동 (변동률 순)
+          </div>
+          <div className="space-y-2.5">
+            {priceChanges.map((c) => {
+              const isUp = c.changeType === "increase";
+              return (
+                <div key={c.articleNo} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 text-sm">
+                      {isUp ? (
+                        <ArrowUpRight className="h-4 w-4 text-red-500 shrink-0" />
+                      ) : (
+                        <ArrowDownRight className="h-4 w-4 text-blue-500 shrink-0" />
+                      )}
+                      <span className="truncate font-medium">{c.title || c.articleNo}</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground ml-6">{c.propertyType} · {c.dealType}</p>
+                  </div>
+                  <div className="text-right shrink-0 ml-3">
+                    <p className={`text-sm font-bold ${isUp ? "text-red-500" : "text-blue-500"}`}>
+                      {isUp ? "+" : ""}{c.rate.toFixed(1)}%
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {formatMoney(c.prevPrice)} → {formatMoney(c.price)}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Bottom */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
