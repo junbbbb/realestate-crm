@@ -33,6 +33,7 @@ import { useRouter } from "next/navigation";
 import { BookmarkButton, CollectionPopup } from "@/components/collection-popup";
 import NaverMap from "@/components/naver-map";
 import { useSettingsStore } from "@/lib/settings-store";
+import { useAuthStore } from "@/runtime/stores/auth-store";
 
 const propertyTypes: (PropertyType | "전체")[] = ["전체", "상가", "건물", "사무실", "상가주택"];
 const dealTypes: (DealType | "전체")[] = ["전체", "매매", "전세", "월세", "단기임대"];
@@ -790,6 +791,17 @@ function MyListingForm({ dongList, onClose, onSaved }: { dongList: string[]; onC
       source_url: "", is_my_listing: true, is_active: true,
       last_seen_at: new Date().toISOString(),
     });
+    // user_listings에도 등록 (유저별 개인매물 격리)
+    let userId = useAuthStore.getState().userId;
+    if (!userId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id || null;
+    }
+    if (userId) {
+      await supabase.from("user_listings").upsert({
+        user_id: userId, property_id: id, created_at: new Date().toISOString(),
+      });
+    }
     useToastStore.getState().show("개인 매물이 등록되었습니다");
     onSaved();
     onClose();
