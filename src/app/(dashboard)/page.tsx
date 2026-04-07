@@ -5,7 +5,9 @@ import { useStore } from "@/lib/store";
 import { useCollectionStore } from "@/lib/collection-store";
 import { supabase } from "@/lib/supabase";
 import { formatMoney, formatPrice } from "@/lib/format";
-import { Building2, Heart, FolderOpen, Users, TrendingUp, TrendingDown, MapPin, Bookmark, Clock, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Building2, Heart, FolderOpen, Users, TrendingUp, TrendingDown, MapPin, Bookmark, Clock, ArrowUpRight, ArrowDownRight, X } from "lucide-react";
+import { DetailPanel } from "@/app/(dashboard)/properties/page";
+import { Property } from "@/types";
 
 export default function Dashboard() {
   const properties = useStore((s) => s.properties);
@@ -19,6 +21,8 @@ export default function Dashboard() {
 
   const favorites = useMemo(() => properties.filter((p) => p.isFavorite), [properties]);
   const myListings = useMemo(() => properties.filter((p) => p.isMyListing), [properties]);
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [priceChangesLoading, setPriceChangesLoading] = useState(true);
 
   // 가격 변동 매물
   const [priceChanges, setPriceChanges] = useState<{
@@ -105,6 +109,7 @@ export default function Dashboard() {
         return Math.abs(b.rate) - Math.abs(a.rate);
       });
       setPriceChanges(changes);
+      setPriceChangesLoading(false);
     })();
   }, []);
 
@@ -146,43 +151,68 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* 가격 변동 */}
-      {priceChanges.length > 0 && (
-        <div className="bg-card rounded-lg p-6">
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-4">
-            <TrendingUp className="h-4 w-4" />
-            최근 7일 가격 변동 (변동률 순)
-          </div>
-          <div className="space-y-2.5">
-            {priceChanges.map((c) => {
-              const isUp = c.changeType === "increase";
-              return (
-                <div key={c.articleNo} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 text-sm">
-                      {isUp ? (
-                        <ArrowUpRight className="h-4 w-4 text-red-500 shrink-0" />
-                      ) : (
-                        <ArrowDownRight className="h-4 w-4 text-blue-500 shrink-0" />
-                      )}
-                      <span className="truncate font-medium">{c.title || c.articleNo}</span>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground ml-6">{c.propertyType} · {c.dealType}</p>
+      {/* 가격 변동 — 상승/하락 카드 */}
+      {priceChangesLoading ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {[{ label: "가격 상승 TOP", color: "text-red-500", Icon: ArrowUpRight }, { label: "가격 하락 TOP", color: "text-blue-500", Icon: ArrowDownRight }].map(({ label, color, Icon }) => (
+            <div key={label} className="bg-card rounded-lg p-6">
+              <div className={`flex items-center gap-2 text-sm font-medium ${color} mb-4`}>
+                <Icon className="h-4 w-4" />{label}
+              </div>
+              <div className="space-y-3 animate-pulse">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="flex items-center justify-between py-1.5">
+                    <div className="space-y-1.5 flex-1"><div className="h-4 bg-muted rounded w-3/4" /><div className="h-3 bg-muted rounded w-1/3" /></div>
+                    <div className="space-y-1.5 ml-3"><div className="h-4 bg-muted rounded w-12" /><div className="h-3 bg-muted rounded w-20" /></div>
                   </div>
-                  <div className="text-right shrink-0 ml-3">
-                    <p className={`text-sm font-bold ${isUp ? "text-red-500" : "text-blue-500"}`}>
-                      {isUp ? "+" : ""}{c.rate.toFixed(1)}%
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {formatMoney(c.prevPrice)} → {formatMoney(c.price)}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
-      )}
+      ) : priceChanges.length > 0 ? (() => {
+        const increases = priceChanges.filter((c) => c.changeType === "increase").sort((a, b) => b.rate - a.rate);
+        const decreases = priceChanges.filter((c) => c.changeType === "decrease").sort((a, b) => a.rate - b.rate);
+        const renderList = (items: typeof priceChanges, isUp: boolean) => (
+          <div className="space-y-1">
+            {items.map((c) => (
+              <div key={c.articleNo} className="flex items-center justify-between py-1.5 border-b border-border last:border-0 cursor-pointer hover:bg-secondary/50 rounded-md px-1 -mx-1 transition-colors" onClick={() => { const p = properties.find((pr) => pr.id === c.articleNo); if (p) setSelectedProperty(p); }}>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{c.title || c.articleNo}</p>
+                  <p className="text-[11px] text-muted-foreground">{c.propertyType} · {c.dealType}</p>
+                </div>
+                <div className="text-right shrink-0 ml-3">
+                  <p className={`text-sm font-bold ${isUp ? "text-red-500" : "text-blue-500"}`}>
+                    {isUp ? "+" : ""}{c.rate.toFixed(1)}%
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {formatMoney(c.prevPrice)} → {formatMoney(c.price)}
+                  </p>
+                </div>
+              </div>
+            ))}
+            {items.length === 0 && <p className="text-sm text-muted-foreground py-2">변동 없음</p>}
+          </div>
+        );
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="bg-card rounded-lg p-6">
+              <div className="flex items-center gap-2 text-sm font-medium text-red-500 mb-4">
+                <ArrowUpRight className="h-4 w-4" />
+                가격 상승 TOP
+              </div>
+              {renderList(increases, true)}
+            </div>
+            <div className="bg-card rounded-lg p-6">
+              <div className="flex items-center gap-2 text-sm font-medium text-blue-500 mb-4">
+                <ArrowDownRight className="h-4 w-4" />
+                가격 하락 TOP
+              </div>
+              {renderList(decreases, false)}
+            </div>
+          </div>
+        );
+      })() : null}
 
       {/* Bottom */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -194,7 +224,7 @@ export default function Dashboard() {
           </div>
           <div className="space-y-3">
             {properties.slice(0, 5).map((p) => (
-              <div key={p.id} className="flex items-center justify-between">
+              <div key={p.id} className="flex items-center justify-between cursor-pointer hover:bg-secondary/50 rounded-md px-1 -mx-1 py-0.5 transition-colors" onClick={() => setSelectedProperty(p)}>
                 <div className="flex items-center gap-2 min-w-0 text-sm">
                   <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <span className="truncate font-medium">{p.title}</span>
@@ -220,7 +250,7 @@ export default function Dashboard() {
                 const time = new Date(s.addedAt);
                 const timeStr = `${(time.getMonth() + 1).toString().padStart(2, "0")}.${time.getDate().toString().padStart(2, "0")} ${time.getHours().toString().padStart(2, "0")}:${time.getMinutes().toString().padStart(2, "0")}`;
                 return (
-                  <div key={`${s.propertyId}-${i}`} className="flex items-start gap-3">
+                  <div key={`${s.propertyId}-${i}`} className="flex items-start gap-3 cursor-pointer hover:bg-secondary/50 rounded-md px-1 -mx-1 py-0.5 transition-colors" onClick={() => { if (p) setSelectedProperty(p); }}>
                     <div className="mt-0.5 h-8 w-8 rounded-lg bg-secondary flex items-center justify-center shrink-0">
                       <Building2 className="h-4 w-4 text-muted-foreground" />
                     </div>
@@ -241,6 +271,14 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+      {/* 매물 상세 모달 */}
+      {selectedProperty && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setSelectedProperty(null)}>
+          <div className="w-full max-w-[420px] max-h-[85vh] mx-4" onClick={(e) => e.stopPropagation()}>
+            <DetailPanel property={selectedProperty} onClose={() => setSelectedProperty(null)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
