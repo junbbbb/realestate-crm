@@ -1,3 +1,5 @@
+import { supabase } from "./supabase";
+
 export interface NaverDetailInfo {
   // basicInfo - facilityInfo
   totalParkingCount?: number;
@@ -34,6 +36,31 @@ export interface NaverDetailInfo {
 
 const cache = new Map<string, { data: NaverDetailInfo; ts: number }>();
 const CACHE_TTL = 5 * 60 * 1000;
+const DB_CACHE_TTL = 24 * 60 * 60 * 1000; // 24시간
+
+async function getDbCache(articleNumber: string): Promise<NaverDetailInfo | null> {
+  try {
+    const { data } = await supabase
+      .from("naver_detail_cache")
+      .select("data, fetched_at")
+      .eq("article_number", articleNumber)
+      .single();
+    if (!data) return null;
+    const age = Date.now() - new Date(data.fetched_at).getTime();
+    if (age > DB_CACHE_TTL) return null;
+    return data.data as NaverDetailInfo;
+  } catch {
+    return null;
+  }
+}
+
+async function setDbCache(articleNumber: string, detail: NaverDetailInfo): Promise<void> {
+  try {
+    await supabase
+      .from("naver_detail_cache")
+      .upsert({ article_number: articleNumber, data: detail, fetched_at: new Date().toISOString() });
+  } catch {}
+}
 
 const LOCAL_PROXY = "http://localhost:4000/naver-detail";
 
@@ -89,6 +116,13 @@ export async function fetchNaverDetail(
 ): Promise<NaverDetailInfo | null> {
   const cached = cache.get(articleNumber);
   if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
+
+  // DB 캐시 확인 (24시간 유효)
+  const dbCached = await getDbCache(articleNumber);
+  if (dbCached) {
+    cache.set(articleNumber, { data: dbCached, ts: Date.now() });
+    return dbCached;
+  }
 
   let json;
   try {
@@ -164,6 +198,7 @@ export async function fetchNaverDetail(
     }
 
     cache.set(articleNumber, { data: detail, ts: Date.now() });
+    setDbCache(articleNumber, detail);
     return detail;
   } catch (e) {
     console.error("fetchNaverDetail error:", e);
