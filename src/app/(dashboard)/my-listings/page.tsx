@@ -83,11 +83,14 @@ function NewDealForm({ onClose, onCreated }: { onClose: () => void; onCreated: (
     // user_listings에도 등록 (유저별 개인매물 격리)
     const userId = useAuthStore.getState().userId;
     if (userId) {
-      await supabase.from("user_listings").upsert({
+      const { error: ulErr } = await supabase.from("user_listings").upsert({
         user_id: userId,
         property_id: id,
         created_at: new Date().toISOString(),
       });
+      if (ulErr) console.error("user_listings upsert failed:", ulErr.message, "userId:", userId);
+    } else {
+      console.error("user_listings skip: no userId");
     }
 
     await addDeal({ propertyId: id, dealType, memo: memo.trim() });
