@@ -2,6 +2,7 @@ from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -57,8 +58,14 @@ class handler(BaseHTTPRequestHandler):
             basic_url = f"{base}/basicInfo?articleNumber={article}&realEstateType={real_estate}&tradeType={trade}"
             agent_url = f"{base}/agent?articleNumber={article}"
 
-            basic_res = cffi_requests.get(basic_url, headers=headers, proxies=proxies, impersonate="chrome", timeout=15)
-            agent_res = cffi_requests.get(agent_url, headers=headers, proxies=proxies, impersonate="chrome", timeout=15)
+            def fetch(url):
+                return cffi_requests.get(url, headers=headers, proxies=proxies, impersonate="chrome", timeout=15)
+
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                basic_future = pool.submit(fetch, basic_url)
+                agent_future = pool.submit(fetch, agent_url)
+                basic_res = basic_future.result()
+                agent_res = agent_future.result()
 
             basic_json = basic_res.json() if basic_res.status_code == 200 else None
             agent_json = agent_res.json() if agent_res.status_code == 200 else None
