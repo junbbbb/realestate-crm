@@ -185,6 +185,7 @@ export function DetailPanel({ property, onClose, onMemoSaved }: { property: Prop
   useEffect(() => { setMemoValue(property.memo ?? ""); }, [property.id, property.memo]);
 
   useEffect(() => {
+    setDetail(null);
     setDetailLoading(true);
     fetchNaverDetail(property.id, property.realEstateTypeCode, property.tradeTypeCode)
       .then((d) => setDetail(d))
@@ -333,7 +334,20 @@ export function DetailPanel({ property, onClose, onMemoSaved }: { property: Prop
         </div>
 
         {/* Tab: 기본 */}
-        {tab === "info" && (
+        {tab === "info" && detailLoading && !detail && (
+          <div className="space-y-3 animate-pulse">
+            <div className="flex gap-1.5">
+              {[80, 60, 70, 55].map((w, i) => <div key={i} className="h-5 rounded-full bg-muted" style={{ width: w }} />)}
+            </div>
+            <div className="rounded-lg bg-muted h-[160px]" />
+            <div className="h-4 bg-muted rounded w-3/4" />
+            <div className="h-px bg-border" />
+            <div className="grid grid-cols-2 gap-3">
+              {[1, 2, 3, 4].map((i) => <div key={i} className="space-y-1"><div className="h-3 bg-muted rounded w-12" /><div className="h-4 bg-muted rounded w-20" /></div>)}
+            </div>
+          </div>
+        )}
+        {tab === "info" && !(detailLoading && !detail) && (
           <div className="space-y-4">
             {/* 1. 핵심 스펙 한줄 태그 */}
             <div className="flex flex-wrap gap-1.5">
@@ -348,7 +362,6 @@ export function DetailPanel({ property, onClose, onMemoSaved }: { property: Prop
               {detail?.bathRoomCount != null && <Badge variant="secondary" className="text-xs">욕실 {detail.bathRoomCount}개</Badge>}
               {detail?.currentBusinessType && <Badge variant="secondary" className="text-xs">현 {detail.currentBusinessType}</Badge>}
               {detail?.isIllegalBuilding && <Badge variant="destructive" className="text-xs">위반건축물</Badge>}
-              {detailLoading && <Badge variant="secondary" className="text-xs"><Loader2 className="h-3 w-3 animate-spin" /></Badge>}
             </div>
 
             {/* 2. 지도 + 주소 */}
