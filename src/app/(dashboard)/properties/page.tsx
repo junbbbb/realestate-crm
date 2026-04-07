@@ -112,7 +112,7 @@ function StartDealModal({ property, sellers, buyers, onConfirm, onClose }: {
   const [buyerId, setBuyerId] = useState<string | null>(null);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40">
+    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/40">
       <div className="bg-card border rounded-lg shadow-lg w-[400px]">
         <div className="p-5 space-y-4">
           <div className="flex items-center justify-between">
