@@ -142,7 +142,6 @@ export const useStore = create<AppState>((set, get) => ({
       const properties = rows.map(mapSupabaseToProperty);
 
       // Overlay user-specific meta (favorites, memos, listings)
-      const userId = useAuthStore.getState().userId;
       if (userId && properties.length > 0) {
         const ids = properties.map((p) => p.id);
         const meta = await propertyRepo.getUserPropertyMeta(userId, ids);
