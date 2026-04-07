@@ -75,7 +75,11 @@ export default function Dashboard() {
           .limit(1);
 
         const prevPrice = prev?.[0]?.price ?? 0;
-        const rate = prevPrice > 0 ? ((h.price - prevPrice) / prevPrice) * 100 : 0;
+
+        // 제외: 이전가 0, 현재가 0, 변동 없음, 극소액(100만원 미만)
+        if (prevPrice === 0 || h.price === 0 || prevPrice === h.price || prevPrice < 1000000) continue;
+
+        const rate = ((h.price - prevPrice) / prevPrice) * 100;
         const prop = propMap.get(h.article_no);
 
         const tradeMap: Record<string, string> = { A1: "매매", B1: "전세", B2: "월세", B3: "단기" };
@@ -95,8 +99,11 @@ export default function Dashboard() {
         if (changes.length >= 10) break;
       }
 
-      // 상승률 높은 순 정렬
-      changes.sort((a, b) => Math.abs(b.rate) - Math.abs(a.rate));
+      // 상승 우선, 그 안에서 변동률 높은 순
+      changes.sort((a, b) => {
+        if (a.changeType !== b.changeType) return a.changeType === "increase" ? -1 : 1;
+        return Math.abs(b.rate) - Math.abs(a.rate);
+      });
       setPriceChanges(changes);
     })();
   }, []);
