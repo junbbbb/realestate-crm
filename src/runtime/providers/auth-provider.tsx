@@ -25,9 +25,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async function resolve() {
       try {
         const supabase = createSupabaseBrowserClient();
+        // getSession reads from cookie (0ms) vs getUser makes a network call (200ms+)
         const {
-          data: { user },
-        } = await supabase.auth.getUser();
+          data: { session },
+        } = await supabase.auth.getSession();
+        const user = session?.user;
 
         if (cancelled) return;
 

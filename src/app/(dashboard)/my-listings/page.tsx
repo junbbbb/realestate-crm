@@ -21,6 +21,7 @@ import { useStore } from "@/lib/store";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/runtime/stores/auth-store";
+import * as propertyRepo from "@/repos/property-repo";
 import { useToastStore } from "@/lib/toast-store";
 
 const propertyTypes = ["상가", "건물", "사무실", "상가주택"];
@@ -81,21 +82,9 @@ function NewDealForm({ onClose, onCreated }: { onClose: () => void; onCreated: (
     });
 
     // user_listings에도 등록 (유저별 개인매물 격리)
-    // AuthStore에서 못 가져오면 Supabase 세션에서 직접 가져옴
-    let userId = useAuthStore.getState().userId;
-    if (!userId) {
-      const { data: { user } } = await supabase.auth.getUser();
-      userId = user?.id || null;
-    }
+    const userId = useAuthStore.getState().userId;
     if (userId) {
-      const { error: ulErr } = await supabase.from("user_listings").upsert({
-        user_id: userId,
-        property_id: id,
-        created_at: new Date().toISOString(),
-      });
-      if (ulErr) console.error("user_listings upsert failed:", ulErr.message, "userId:", userId);
-    } else {
-      console.error("user_listings skip: no userId available");
+      await propertyRepo.toggleMyListing(userId, id, true);
     }
 
     await addDeal({ propertyId: id, dealType, memo: memo.trim() });

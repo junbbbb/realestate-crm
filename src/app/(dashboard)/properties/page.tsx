@@ -34,6 +34,7 @@ import { BookmarkButton, CollectionPopup } from "@/components/collection-popup";
 import NaverMap from "@/components/naver-map";
 import { useSettingsStore } from "@/lib/settings-store";
 import { useAuthStore } from "@/runtime/stores/auth-store";
+import * as propertyRepo from "@/repos/property-repo";
 
 const propertyTypes: (PropertyType | "전체")[] = ["전체", "상가", "건물", "사무실", "상가주택"];
 const dealTypes: (DealType | "전체")[] = ["전체", "매매", "전세", "월세", "단기임대"];
@@ -792,15 +793,9 @@ function MyListingForm({ dongList, onClose, onSaved }: { dongList: string[]; onC
       last_seen_at: new Date().toISOString(),
     });
     // user_listings에도 등록 (유저별 개인매물 격리)
-    let userId = useAuthStore.getState().userId;
-    if (!userId) {
-      const { data: { user } } = await supabase.auth.getUser();
-      userId = user?.id || null;
-    }
+    const userId = useAuthStore.getState().userId;
     if (userId) {
-      await supabase.from("user_listings").upsert({
-        user_id: userId, property_id: id, created_at: new Date().toISOString(),
-      });
+      await propertyRepo.toggleMyListing(userId, id, true);
     }
     useToastStore.getState().show("개인 매물이 등록되었습니다");
     onSaved();
@@ -940,15 +935,6 @@ export default function Properties() {
     return unsub;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // userId 세팅 후 재조회 (새로고침 시 AuthProvider 비동기 완료 후)
-  const authUserId = useAuthStore((s) => s.userId);
-  useEffect(() => {
-    if (authUserId && settingsApplied) {
-      loadProperties();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authUserId]);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const compareCache = useStore((s) => s.compareCache);

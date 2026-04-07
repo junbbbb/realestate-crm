@@ -13,8 +13,9 @@ export async function loadProperties(
 ): Promise<{ data: SupabaseProperty[]; count: number }> {
   try {
     // 내 개인매물 ID 가져오기 (user_listings 테이블)
+    // 네이버 탭은 개인매물을 전부 숨기므로 user_listings 조회 불필요
     let myListingIds = new Set<string>();
-    if (userId) {
+    if (userId && filters.source !== "네이버") {
       const { data: myListings } = await supabase
         .from("user_listings")
         .select("property_id")

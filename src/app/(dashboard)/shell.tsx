@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCollectionStore } from "@/lib/collection-store";
 import { AuthProvider } from "@/runtime/providers/auth-provider";
-import { useAuthStore } from "@/runtime/stores/auth-store";
 import {
   LayoutDashboard,
   Building2,
