@@ -81,7 +81,12 @@ function NewDealForm({ onClose, onCreated }: { onClose: () => void; onCreated: (
     });
 
     // user_listings에도 등록 (유저별 개인매물 격리)
-    const userId = useAuthStore.getState().userId;
+    // AuthStore에서 못 가져오면 Supabase 세션에서 직접 가져옴
+    let userId = useAuthStore.getState().userId;
+    if (!userId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id || null;
+    }
     if (userId) {
       const { error: ulErr } = await supabase.from("user_listings").upsert({
         user_id: userId,
@@ -90,7 +95,7 @@ function NewDealForm({ onClose, onCreated }: { onClose: () => void; onCreated: (
       });
       if (ulErr) console.error("user_listings upsert failed:", ulErr.message, "userId:", userId);
     } else {
-      console.error("user_listings skip: no userId");
+      console.error("user_listings skip: no userId available");
     }
 
     await addDeal({ propertyId: id, dealType, memo: memo.trim() });
