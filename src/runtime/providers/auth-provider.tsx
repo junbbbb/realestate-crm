@@ -73,9 +73,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
  * Hook to read current auth state from anywhere in the component tree.
  */
 export function useAuth() {
-  return useAuthStore((s) => ({
-    userId: s.userId,
-    user: s.user,
-    isLoading: s.isLoading,
-  }));
+  const userId = useAuthStore((s) => s.userId);
+  const user = useAuthStore((s) => s.user);
+  const isLoading = useAuthStore((s) => s.isLoading);
+  return { userId, user, isLoading };
 }

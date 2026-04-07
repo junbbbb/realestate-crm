@@ -16,11 +16,8 @@ export async function loadCollections(
     .select("*")
     .order("created_at", { ascending: false });
 
-  // If authenticated user, filter by user_id; for PIN user fallback, allow null
-  if (userId && userId !== "pin-user") {
+  if (userId) {
     query = query.eq("user_id", userId);
-  } else {
-    query = query.is("user_id", null);
   }
 
   const { data, error } = await query;
@@ -60,7 +57,7 @@ export async function addCollection(
     entries: [],
     created_at: now,
   };
-  if (userId && userId !== "pin-user") {
+  if (userId) {
     row.user_id = userId;
   }
 

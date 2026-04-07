@@ -7,8 +7,8 @@ export const MAX_COMPARE_COUNT = 5;
 /** Debounce delay for search input (ms) */
 export const SEARCH_DEBOUNCE_MS = 300;
 
-/** Fallback userId for PIN-authenticated (single-user) sessions */
-export const PIN_USER_ID = "pin-user";
+/** PIN 사용자(0641)의 고정 UUID — auth.users에 실제 존재 */
+export const PIN_USER_ID = "02e4efdf-0453-5d57-ba66-dc6e9506bd21";
 
 /** Max crawl logs to keep in settings */
 export const MAX_CRAWL_LOGS = 100;

@@ -12,10 +12,8 @@ export async function loadCustomers(
     .select("*")
     .order("created_at", { ascending: false });
 
-  if (userId && userId !== "pin-user") {
+  if (userId) {
     query = query.eq("user_id", userId);
-  } else {
-    query = query.is("user_id", null);
   }
 
   const { data, error } = await query;
@@ -63,7 +61,7 @@ export async function addCustomer(
     business_type: c.businessType || null,
     premium_budget: c.premiumBudget || 0,
   };
-  if (userId && userId !== "pin-user") {
+  if (userId) {
     row.user_id = userId;
   }
 

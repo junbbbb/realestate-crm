@@ -18,10 +18,8 @@ export async function loadDeals(userId: string | null): Promise<Deal[]> {
     )
     .order("position", { ascending: true });
 
-  if (userId && userId !== "pin-user") {
+  if (userId) {
     query = query.eq("user_id", userId);
-  } else {
-    query = query.is("user_id", null);
   }
 
   const { data, error } = await query;
@@ -88,7 +86,7 @@ export async function addDeal(
     memo: d.memo || "",
     position: newPos,
   };
-  if (userId && userId !== "pin-user") {
+  if (userId) {
     row.user_id = userId;
   }
 

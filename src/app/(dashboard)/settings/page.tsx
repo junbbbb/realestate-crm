@@ -10,9 +10,65 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import {
-  Settings, Monitor, Database, Trash2, CheckCircle, XCircle, Clock, LogOut,
+  Settings, Monitor, Database, Trash2, CheckCircle, XCircle, Clock, LogOut, User,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/runtime/providers/auth-provider";
+import { PIN_USER_ID } from "@/config/constants";
+
+function AccountSection() {
+  const { user, userId } = useAuth();
+  const router = useRouter();
+  const name = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0];
+  const email = user?.email;
+  const avatar = user?.user_metadata?.avatar_url || user?.user_metadata?.picture;
+  const isPinUser = userId === PIN_USER_ID;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <User className="h-5 w-5 text-muted-foreground" />
+        <h2 className="text-lg font-semibold">계정</h2>
+      </div>
+
+      <div className="bg-card rounded-lg border p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {avatar ? (
+              <img src={avatar} alt="" className="h-10 w-10 rounded-full" />
+            ) : (
+              <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center">
+                <span className="text-sm font-bold text-muted-foreground">
+                  {name ? name[0].toUpperCase() : "P"}
+                </span>
+              </div>
+            )}
+            <div>
+              <p className="font-medium">{name || (isPinUser ? "PIN 사용자" : "사용자")}</p>
+              {email && <p className="text-sm text-muted-foreground">{email}</p>}
+              {isPinUser && <p className="text-xs text-muted-foreground">PIN 로그인</p>}
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-red-500 hover:text-red-600 hover:bg-red-50 gap-1.5"
+            onClick={async () => {
+              await fetch("/api/auth", { method: "DELETE" });
+              const { createSupabaseBrowserClient } = await import("@/lib/supabase-auth");
+              const supabase = createSupabaseBrowserClient();
+              await supabase.auth.signOut();
+              router.push("/login");
+            }}
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            로그아웃
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const pageSizeOptions = [20, 50, 100, 200];
 
@@ -212,23 +268,9 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* 로그아웃 */}
+      {/* 계정 + 로그아웃 */}
       <Separator />
-      <Button
-        variant="outline"
-        className="w-full text-red-500 hover:text-red-600 hover:bg-red-50 gap-2"
-        onClick={async () => {
-          // PIN 쿠키 삭제
-          await fetch("/api/auth", { method: "DELETE" });
-          // Supabase 세션 삭제 (Google 로그인 등)
-          const { createSupabaseBrowserClient } = await import("@/lib/supabase-auth");
-          const supabase = createSupabaseBrowserClient();
-          await supabase.auth.signOut();
-          router.push("/login");
-        }}
-      >
-        <LogOut className="h-4 w-4" />로그아웃
-      </Button>
+      <AccountSection />
     </div>
   );
 }

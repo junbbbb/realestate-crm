@@ -9,6 +9,23 @@ import { Building2, FolderOpen, Users, MapPin, Bookmark, Clock, ArrowUpRight, Ar
 import { mapSupabaseToProperty } from "@/lib/store";
 import { DetailPanel } from "@/app/(dashboard)/properties/page";
 import { Property } from "@/types";
+import { useAuth } from "@/runtime/providers/auth-provider";
+import { PIN_USER_ID } from "@/config/constants";
+
+function DashboardGreeting() {
+  const { user, userId } = useAuth();
+  const name = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0];
+  const isPinUser = userId === PIN_USER_ID;
+
+  return (
+    <div>
+      <h1 className="text-2xl md:text-3xl font-bold">
+        {name ? `${name}님, 안녕하세요` : isPinUser ? "대시보드" : "대시보드"}
+      </h1>
+      {name && <p className="text-sm text-muted-foreground mt-0.5">{user?.email}</p>}
+    </div>
+  );
+}
 
 function PriceHistoryPanel({ articleNo }: { articleNo: string }) {
   const [history, setHistory] = useState<{ price: number; change_type: string; recorded_at: string }[]>([]);
@@ -135,7 +152,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl md:text-3xl font-bold">대시보드</h1>
+      <DashboardGreeting />
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

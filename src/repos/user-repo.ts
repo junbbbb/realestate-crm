@@ -23,7 +23,7 @@ const DEFAULT_SETTINGS: UserSettings = {
 export async function getSettings(
   userId: string | null
 ): Promise<UserSettings> {
-  if (!userId || userId === "pin-user") {
+  if (!userId) {
     return DEFAULT_SETTINGS;
   }
 
@@ -57,8 +57,7 @@ export async function saveSettings(
   userId: string | null,
   settings: Partial<UserSettings>
 ): Promise<boolean> {
-  if (!userId || userId === "pin-user") {
-    // PIN users keep using localStorage (settings-store handles this)
+  if (!userId) {
     return true;
   }
 
