@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { formatMoney, formatPrice } from "@/lib/format";
 import { Building2, Heart, FolderOpen, Users, TrendingUp, TrendingDown, MapPin, Bookmark, Clock, ArrowUpRight, ArrowDownRight, X, Loader2 } from "lucide-react";
 import { mapSupabaseToProperty } from "@/lib/store";
+import { DetailPanel } from "@/app/(dashboard)/properties/page";
 import { Property } from "@/types";
 
 function PriceHistoryPanel({ articleNo }: { articleNo: string }) {
@@ -195,7 +196,7 @@ export default function Dashboard() {
         );
         const updatedStr = priceChangesUpdatedAt ? (() => {
           const d = new Date(priceChangesUpdatedAt);
-          return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")} 기준`;
+          return `${d.getMonth()+1}/${d.getDate()} 업데이트됨`;
         })() : "";
         return (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -280,59 +281,15 @@ export default function Dashboard() {
       {/* 매물 상세 모달 — 가로형 */}
       {selectedProperty && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setSelectedProperty(null)}>
-          <div className="w-full max-w-[900px] max-h-[80vh] mx-4 bg-card rounded-xl shadow-2xl overflow-hidden flex" onClick={(e) => e.stopPropagation()}>
-            {/* 왼쪽: 핵심 정보 */}
-            <div className="flex-1 p-6 overflow-y-auto space-y-4">
-              <div>
-                <h2 className="text-xl font-bold">{selectedProperty.title}</h2>
-                <p className="text-sm text-muted-foreground mt-0.5">{selectedProperty.propertyType} · {selectedProperty.address}</p>
-              </div>
-              <div className="bg-secondary rounded-lg px-4 py-3">
-                <p className="text-lg font-bold">
-                  <span className="text-sm font-medium text-muted-foreground mr-1.5">{selectedProperty.dealType}</span>
-                  {formatPrice(selectedProperty)}
-                </p>
-                {selectedProperty.premiumKey && (
-                  <p className="text-xs text-muted-foreground mt-1">권리금: {formatMoney(selectedProperty.premiumKey)}</p>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="space-y-0.5">
-                  <p className="text-[11px] text-muted-foreground">면적</p>
-                  <p className="font-medium">{selectedProperty.areaLabel}</p>
-                </div>
-                {selectedProperty.floor && (
-                  <div className="space-y-0.5">
-                    <p className="text-[11px] text-muted-foreground">층</p>
-                    <p className="font-medium">{selectedProperty.floor}/{selectedProperty.totalFloors}층</p>
-                  </div>
-                )}
-              </div>
-              {selectedProperty.features.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedProperty.features.map((f, i) => (
-                    <span key={i} className="inline-flex items-center rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium">{f}</span>
-                  ))}
-                </div>
-              )}
+          <div className="w-full max-w-[900px] h-[85vh] mx-4 bg-card rounded-xl shadow-2xl overflow-hidden flex" onClick={(e) => e.stopPropagation()}>
+            {/* 왼쪽: 매물 상세 (DetailPanel) */}
+            <div className="flex-1 overflow-hidden">
+              <DetailPanel property={selectedProperty} onClose={() => setSelectedProperty(null)} />
             </div>
-            {/* 오른쪽: 가격 변동 이력 + 액션 */}
-            <div className="w-[300px] border-l border-border p-6 flex flex-col bg-secondary/30">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold">가격 변동 이력</h3>
-                <button onClick={() => setSelectedProperty(null)} className="text-muted-foreground hover:text-foreground">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
+            {/* 오른쪽: 가격 변동 이력 */}
+            <div className="w-[280px] border-l border-border p-5 flex flex-col bg-secondary/30">
+              <h3 className="text-sm font-bold mb-4">가격 변동 이력</h3>
               <PriceHistoryPanel articleNo={selectedProperty.id} />
-              <div className="mt-auto pt-4 space-y-2">
-                <a
-                  href={`/properties?select=${selectedProperty.id}`}
-                  className="flex items-center justify-center h-9 w-full rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-                >
-                  상세 페이지로 이동
-                </a>
-              </div>
             </div>
           </div>
         </div>
