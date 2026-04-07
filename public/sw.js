@@ -46,6 +46,9 @@ self.addEventListener("fetch", (event) => {
   // Supabase requests: network-only (don't cache auth/realtime)
   if (url.hostname.includes("supabase")) return;
 
+  // Localhost proxy: pass through directly (don't intercept)
+  if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return;
+
   // External scripts (naver maps, fonts): cache-first
   if (url.origin !== self.location.origin) {
     event.respondWith(
