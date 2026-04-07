@@ -20,6 +20,7 @@ import {
 import { useStore } from "@/lib/store";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { useAuthStore } from "@/runtime/stores/auth-store";
 import { useToastStore } from "@/lib/toast-store";
 
 const propertyTypes = ["상가", "건물", "사무실", "상가주택"];
@@ -78,6 +79,16 @@ function NewDealForm({ onClose, onCreated }: { onClose: () => void; onCreated: (
       is_active: true,
       last_seen_at: new Date().toISOString(),
     });
+
+    // user_listings에도 등록 (유저별 개인매물 격리)
+    const userId = useAuthStore.getState().userId;
+    if (userId) {
+      await supabase.from("user_listings").upsert({
+        user_id: userId,
+        property_id: id,
+        created_at: new Date().toISOString(),
+      });
+    }
 
     await addDeal({ propertyId: id, dealType, memo: memo.trim() });
     onCreated();
