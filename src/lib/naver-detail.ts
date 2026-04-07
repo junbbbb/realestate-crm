@@ -35,43 +35,10 @@ export interface NaverDetailInfo {
 const cache = new Map<string, { data: NaverDetailInfo; ts: number }>();
 const CACHE_TTL = 5 * 60 * 1000;
 
-const CLOUD_PROXY = "http://168.107.9.180:4000/naver-detail";
-const LOCAL_PROXY = "http://localhost:4000/naver-detail";
-
-async function fetchViaCloudProxy(articleNumber: string, realEstateType: string, tradeType: string) {
-  const url = `${CLOUD_PROXY}?articleNumber=${articleNumber}&realEstateType=${realEstateType}&tradeType=${tradeType}`;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
-  try {
-    const res = await fetch(url, { signal: controller.signal });
-    if (!res.ok) throw new Error(`cloud proxy ${res.status}`);
-    const json = await res.json();
-    if (!json.basicInfo && !json.agentInfo) throw new Error("empty");
-    return json;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-async function fetchViaLocalProxy(articleNumber: string, realEstateType: string, tradeType: string) {
-  const url = `${LOCAL_PROXY}?articleNumber=${articleNumber}&realEstateType=${realEstateType}&tradeType=${tradeType}`;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 3000);
-  try {
-    const res = await fetch(url, { signal: controller.signal });
-    if (!res.ok) throw new Error(`proxy ${res.status}`);
-    const json = await res.json();
-    if (!json.basicInfo && !json.agentInfo) throw new Error("empty");
-    return json;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
 async function fetchViaServer(articleNumber: string, realEstateType: string, tradeType: string) {
   const url = `/api/naver-detail?articleNumber=${articleNumber}&realEstateType=${realEstateType}&tradeType=${tradeType}`;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
+  const timeout = setTimeout(() => controller.abort(), 10000);
   try {
     const res = await fetch(url, { signal: controller.signal });
     if (!res.ok) throw new Error(`server ${res.status}`);
@@ -93,20 +60,10 @@ export async function fetchNaverDetail(
 
   let json;
   try {
-    // 1차: Oracle Cloud 프록시 (한국 IP, 상시 운영)
-    json = await fetchViaCloudProxy(articleNumber, realEstateType, tradeType);
+    // 브라우저 → Vercel API → Oracle Cloud 프록시 (한국 IP)
+    json = await fetchViaServer(articleNumber, realEstateType, tradeType);
   } catch {
-    try {
-      // 2차: 로컬 프록시 (fallback)
-      json = await fetchViaLocalProxy(articleNumber, realEstateType, tradeType);
-    } catch {
-      try {
-        // 3차: 서버 API route
-        json = await fetchViaServer(articleNumber, realEstateType, tradeType);
-      } catch {
-        return null;
-      }
-    }
+    return null;
   }
 
   try {
