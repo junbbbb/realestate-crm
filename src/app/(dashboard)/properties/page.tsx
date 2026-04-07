@@ -18,7 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Heart, Search, RotateCcw, Inbox, X, MapPin, Ruler, BedDouble, Building, Phone,
   TrendingUp, Store, Users, FileText, BarChart3, Scale, Calculator, Plus, Bookmark,
-  Car, Bath, Flame, CalendarCheck, Loader2, KeyRound, ExternalLink, StickyNote, Handshake, Trash2,
+  Car, Bath, Flame, CalendarCheck, Loader2, KeyRound, ExternalLink, StickyNote, Handshake, Trash2, RefreshCw,
 } from "lucide-react";
 import {
   fetchNaverDetail, NaverDetailInfo,
@@ -184,13 +184,18 @@ export function DetailPanel({ property, onClose, onMemoSaved }: { property: Prop
 
   useEffect(() => { setMemoValue(property.memo ?? ""); }, [property.id, property.memo]);
 
-  useEffect(() => {
-    setDetail(null);
+  const loadDetail = (skipCache = false) => {
+    if (skipCache) setDetail(null);
     setDetailLoading(true);
-    fetchNaverDetail(property.id, property.realEstateTypeCode, property.tradeTypeCode)
+    fetchNaverDetail(property.id, property.realEstateTypeCode, property.tradeTypeCode, { skipCache })
       .then((d) => setDetail(d))
       .catch(() => setDetail(null))
       .finally(() => setDetailLoading(false));
+  };
+
+  useEffect(() => {
+    setDetail(null);
+    loadDetail();
   }, [property.id, property.realEstateTypeCode, property.tradeTypeCode]);
 
   const yieldRate = getYield(property);
@@ -331,6 +336,14 @@ export function DetailPanel({ property, onClose, onMemoSaved }: { property: Prop
               {t.label}
             </button>
           ))}
+          <button
+            onClick={() => loadDetail(true)}
+            disabled={detailLoading}
+            className="ml-auto p-1.5 text-muted-foreground hover:text-foreground rounded-md transition-colors"
+            title="상세정보 새로고침"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${detailLoading ? "animate-spin" : ""}`} />
+          </button>
         </div>
 
         {/* Tab: 기본 */}

@@ -40,11 +40,15 @@ const DB_CACHE_TTL = 24 * 60 * 60 * 1000; // 24시간
 
 async function getDbCache(articleNumber: string): Promise<NaverDetailInfo | null> {
   try {
-    const { data } = await supabase
-      .from("naver_detail_cache")
-      .select("data, fetched_at")
-      .eq("article_number", articleNumber)
-      .single();
+    const result = await Promise.race([
+      supabase
+        .from("naver_detail_cache")
+        .select("data, fetched_at")
+        .eq("article_number", articleNumber)
+        .single(),
+      new Promise<{ data: null }>((resolve) => setTimeout(() => resolve({ data: null }), 2000)),
+    ]);
+    const { data } = result;
     if (!data) return null;
     const age = Date.now() - new Date(data.fetched_at).getTime();
     if (age > DB_CACHE_TTL) return null;
@@ -59,7 +63,14 @@ async function setDbCache(articleNumber: string, detail: NaverDetailInfo): Promi
     await supabase
       .from("naver_detail_cache")
       .upsert({ article_number: articleNumber, data: detail, fetched_at: new Date().toISOString() });
-  } catch {}
+    // 7일 지난 캐시 정리 (매 저장 시 확률적으로)
+    if (Math.random() < 0.05) {
+      const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      supabase.from("naver_detail_cache").delete().lt("fetched_at", cutoff).then();
+    }
+  } catch (e) {
+    console.warn("setDbCache failed:", e);
+  }
 }
 
 const LOCAL_PROXY = "http://localhost:4000/naver-detail";
@@ -112,16 +123,19 @@ async function fetchViaServer(articleNumber: string, realEstateType: string, tra
 export async function fetchNaverDetail(
   articleNumber: string,
   realEstateType: string,
-  tradeType: string
+  tradeType: string,
+  options?: { skipCache?: boolean }
 ): Promise<NaverDetailInfo | null> {
-  const cached = cache.get(articleNumber);
-  if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
+  if (!options?.skipCache) {
+    const cached = cache.get(articleNumber);
+    if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
 
-  // DB 캐시 확인 (24시간 유효)
-  const dbCached = await getDbCache(articleNumber);
-  if (dbCached) {
-    cache.set(articleNumber, { data: dbCached, ts: Date.now() });
-    return dbCached;
+    // DB 캐시 확인 (24시간 유효)
+    const dbCached = await getDbCache(articleNumber);
+    if (dbCached) {
+      cache.set(articleNumber, { data: dbCached, ts: Date.now() });
+      return dbCached;
+    }
   }
 
   let json;
