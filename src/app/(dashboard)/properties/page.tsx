@@ -219,73 +219,68 @@ export function DetailPanel({ property, onClose, onMemoSaved }: { property: Prop
       <div className="p-6 space-y-5">
         {/* Header */}
         <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <div className="flex gap-2">
-              <Badge className="bg-primary text-primary-foreground text-xs">{property.dealType}</Badge>
-              <Badge variant="outline" className="text-xs">{property.propertyType}</Badge>
-            </div>
-            <h2 className="text-xl font-bold mt-2">{property.title}</h2>
+          <div>
+            <h2 className="text-xl font-bold">{property.title}</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">{property.propertyType} · {property.address}</p>
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Price + Yield + 네이버 링크 */}
+        {/* Price + Yield */}
         <div className="bg-secondary rounded-lg px-4 py-3">
           <div className="flex items-center justify-between">
-            <p className="text-lg font-bold">{formatPrice(property)}</p>
-            <div className="flex items-center gap-2">
-              {yieldRate && (
-                <p className="text-sm font-bold text-green-600 flex items-center gap-1">
-                  {yieldRate.toFixed(1)}%
-                  <span className="relative group/tip">
-                    <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-muted text-[10px] text-muted-foreground cursor-help">?</span>
-                    <span className="absolute bottom-6 right-0 hidden group-hover/tip:block w-[200px] bg-foreground text-background text-[11px] rounded-lg p-2.5 leading-relaxed shadow-lg z-50">
-                      연 수익률 = (월세 × 12) / 보증금 × 100<br /><br />
-                      월세 매물에만 표시됩니다. 권리금, 인테리어 비용 등은 미포함된 단순 수익률입니다.
-                    </span>
+            <p className="text-lg font-bold"><span className="text-sm font-medium text-muted-foreground mr-1.5">{property.dealType}</span>{formatPrice(property)}</p>
+            {yieldRate && (
+              <p className="text-sm font-bold text-green-600 flex items-center gap-1">
+                {yieldRate.toFixed(1)}%
+                <span className="relative group/tip">
+                  <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-muted text-[10px] text-muted-foreground cursor-help">?</span>
+                  <span className="absolute bottom-6 right-0 hidden group-hover/tip:block w-[200px] bg-foreground text-background text-[11px] rounded-lg p-2.5 leading-relaxed shadow-lg z-50">
+                    연 수익률 = (월세 × 12) / 보증금 × 100<br /><br />
+                    월세 매물에만 표시됩니다. 권리금, 인테리어 비용 등은 미포함된 단순 수익률입니다.
                   </span>
-                </p>
-              )}
-              <a
-                href={(() => {
-                  const lng = Number(detail?.coordinates?.xCoordinate ?? 126.908);
-                  const lat = Number(detail?.coordinates?.yCoordinate ?? 37.556);
-                  const zoom = 19;
-                  const n = Math.pow(2, zoom);
-                  const tileX = Math.floor((lng + 180) / 360 * n);
-                  const latRad = lat * Math.PI / 180;
-                  const tileY = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n);
-                  const layer = compressToEncodedURIComponent(JSON.stringify([
-                    { id: "article_list", searchParams: { type: "CLUSTER", clusterId: `${zoom}/${tileX}/${tileY}` } },
-                    { id: "article_detail", params: { articleId: property.id }, searchParams: {} }
-                  ]));
-                  return `https://fin.land.naver.com/map?center=${lng}-${lat}&zoom=16&tradeTypes=A1-B1-B2-B3&realEstateTypes=D02-D03-D04-E01-Z00&layer=${layer}`;
-                })()}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center h-6 px-2 rounded text-[11px] font-bold text-white bg-[#03C75A] hover:bg-[#02b351] transition-colors"
-                title="네이버에서 보기"
-              >
-                N
-              </a>
-            </div>
+                </span>
+              </p>
+            )}
           </div>
           {property.premiumKey && (
             <p className="text-xs text-muted-foreground mt-1">권리금: {formatMoney(property.premiumKey)}</p>
           )}
         </div>
 
-        {/* 거래 시작 */}
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full text-sm gap-1.5"
-          onClick={() => setShowDealModal(true)}
-        >
-          <Handshake className="h-4 w-4" />거래 시작
-        </Button>
+        {/* 거래 시작 + 네이버 바로가기 */}
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="flex-1 h-9 text-sm gap-1.5"
+            onClick={() => setShowDealModal(true)}
+          >
+            <Handshake className="h-3.5 w-3.5" />거래 시작
+          </Button>
+          <a
+            href={(() => {
+              const lng = Number(detail?.coordinates?.xCoordinate ?? 126.908);
+              const lat = Number(detail?.coordinates?.yCoordinate ?? 37.556);
+              const zoom = 19;
+              const n = Math.pow(2, zoom);
+              const tileX = Math.floor((lng + 180) / 360 * n);
+              const latRad = lat * Math.PI / 180;
+              const tileY = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n);
+              const layer = compressToEncodedURIComponent(JSON.stringify([
+                { id: "article_list", searchParams: { type: "CLUSTER", clusterId: `${zoom}/${tileX}/${tileY}` } },
+                { id: "article_detail", params: { articleId: property.id }, searchParams: {} }
+              ]));
+              return `https://fin.land.naver.com/map?center=${lng}-${lat}&zoom=16&tradeTypes=A1-B1-B2-B3&realEstateTypes=D02-D03-D04-E01-Z00&layer=${layer}`;
+            })()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center h-9 px-3 rounded-md border border-input text-sm font-medium gap-1.5 hover:bg-accent hover:text-accent-foreground transition-colors"
+          >
+            <span className="inline-flex items-center justify-center h-4 w-4 rounded-sm bg-[#03C75A] text-white text-[10px] font-bold leading-none">N</span>네이버
+          </a>
+        </div>
 
         {showDealModal && (() => {
           const sellers = customers.filter((c) => c.role === "seller" || c.role === "both");

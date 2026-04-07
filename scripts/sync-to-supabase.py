@@ -205,6 +205,36 @@ def main():
     except Exception as e:
         print(f"  deactivate 에러: {e}")
 
+    # 가격 변동 랭킹 계산
+    changes = [r for r in rows if r.get("price_change") in ("increase", "decrease") and (r.get("prev_price") or 0) >= 1000000 and r.get("price", 0) > 0]
+    increases = sorted([r for r in changes if r["price_change"] == "increase"], key=lambda r: (r["price"] - r["prev_price"]) / r["prev_price"] if r["prev_price"] else 0, reverse=True)[:6]
+    decreases = sorted([r for r in changes if r["price_change"] == "decrease"], key=lambda r: (r["price"] - r["prev_price"]) / r["prev_price"] if r["prev_price"] else 0)[:6]
+
+    rankings = []
+    trade_map = {"A1": "매매", "B1": "전세", "B2": "월세", "B3": "단기임대"}
+    for r in increases + decreases:
+        prev = r.get("prev_price", 0)
+        cur = r.get("price", 0)
+        rate = ((cur - prev) / prev * 100) if prev else 0
+        rankings.append({
+            "article_no": r["id"],
+            "article_name": r.get("article_name", ""),
+            "property_type": r.get("property_type", ""),
+            "trade_type": trade_map.get(r.get("real_estate_type", ""), r.get("trade_type", "")),
+            "change_type": r["price_change"],
+            "prev_price": prev,
+            "current_price": cur,
+            "rate": round(rate, 2),
+        })
+
+    if rankings:
+        try:
+            supabase.table("price_change_rankings").delete().neq("id", 0).execute()
+            supabase.table("price_change_rankings").insert(rankings).execute()
+            print(f"  가격변동 랭킹: 상승 {len(increases)}건, 하락 {len(decreases)}건")
+        except Exception as e:
+            print(f"  랭킹 에러: {e}")
+
     # 최종 확인
     active = supabase.table("properties").select("id", count="exact").eq("is_active", True).execute()
     print(f"\n=== 활성 매물: {active.count}건 ===")

@@ -30,7 +30,7 @@ HEADERS = {
 CLUSTERS_URL = "https://fin.land.naver.com/front-api/v1/article/map/articleClusters"
 ARTICLES_URL = "https://fin.land.naver.com/front-api/v1/article/clusteredArticles"
 
-REGIONS = json.load(open("data/regions.json"))["regionList"]
+REGIONS = json.load(open("data/regions.json", encoding="utf-8"))["regionList"]
 
 # 동별 bounding box (centerLat/centerLon 기준 약 ±0.01)
 def region_bbox(region, pad=0.015):

@@ -55,25 +55,6 @@ function PriceHistoryPanel({ articleNo }: { articleNo: string }) {
   );
 }
 
-const CACHE_KEY = "dashboard_price_changes";
-const CACHE_TTL = 60 * 60 * 1000; // 1시간
-
-function getCachedPriceChanges() {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return null;
-    const { data, ts } = JSON.parse(raw);
-    if (Date.now() - ts > CACHE_TTL) return null;
-    return data;
-  } catch { return null; }
-}
-
-function setCachedPriceChanges(data: unknown) {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
-  } catch {}
-}
-
 export default function Dashboard() {
   const properties = useStore((s) => s.properties);
   const totalCount = useStore((s) => s.totalCount);
@@ -96,102 +77,36 @@ export default function Dashboard() {
     if (data) setSelectedProperty(mapSupabaseToProperty(data));
   };
 
-  // 가격 변동 매물
+  // 가격 변동 매물 — price_change_rankings 테이블에서 12행 읽기
   const [priceChanges, setPriceChanges] = useState<{
     articleNo: string;
     changeType: string;
     price: number;
     prevPrice: number;
     rate: number;
-    recordedAt: string;
     title?: string;
     propertyType?: string;
     dealType?: string;
   }[]>([]);
 
   useEffect(() => {
-    (async () => {
-      // 캐시 확인
-      const cached = getCachedPriceChanges();
-      if (cached) {
-        setPriceChanges(cached);
+    supabase
+      .from("price_change_rankings")
+      .select("*")
+      .order("rate", { ascending: false })
+      .then(({ data }) => {
+        setPriceChanges((data || []).map((r) => ({
+          articleNo: r.article_no,
+          changeType: r.change_type,
+          price: r.current_price,
+          prevPrice: r.prev_price,
+          rate: r.rate,
+          title: r.article_name,
+          propertyType: r.property_type,
+          dealType: r.trade_type,
+        })));
         setPriceChangesLoading(false);
-        return;
-      }
-
-      // 최근 7일 가격 변동 (increase/decrease)
-      const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const { data: history } = await supabase
-        .from("price_history")
-        .select("article_no, change_type, price, recorded_at")
-        .in("change_type", ["increase", "decrease"])
-        .gte("recorded_at", cutoff)
-        .order("recorded_at", { ascending: false })
-        .limit(200);
-
-      if (!history || history.length === 0) { setPriceChanges([]); return; }
-
-      // 이전 가격 조회를 위해 article_no별로 그룹핑
-      const articleIds = [...new Set(history.map((h) => h.article_no))];
-
-      // 매물 정보 조회
-      const { data: props } = await supabase
-        .from("properties")
-        .select("id, article_no, article_name, property_type, trade_type")
-        .in("id", articleIds);
-
-      const propMap = new Map((props || []).map((p) => [p.id, p]));
-
-      // 각 변동 건에 대해 이전 가격 조회
-      const changes = [];
-      const seen = new Set<string>();
-      for (const h of history) {
-        if (seen.has(h.article_no)) continue;
-        seen.add(h.article_no);
-
-        // 이전 가격: 해당 건 바로 이전 기록
-        const { data: prev } = await supabase
-          .from("price_history")
-          .select("price")
-          .eq("article_no", h.article_no)
-          .lt("recorded_at", h.recorded_at)
-          .order("recorded_at", { ascending: false })
-          .limit(1);
-
-        const prevPrice = prev?.[0]?.price ?? 0;
-
-        // 제외: 이전가 0, 현재가 0, 변동 없음, 극소액(100만원 미만)
-        if (prevPrice === 0 || h.price === 0 || prevPrice === h.price || prevPrice < 1000000) continue;
-
-        const rate = ((h.price - prevPrice) / prevPrice) * 100;
-        const prop = propMap.get(h.article_no);
-
-        const tradeMap: Record<string, string> = { A1: "매매", B1: "전세", B2: "월세", B3: "단기" };
-
-        changes.push({
-          articleNo: h.article_no,
-          changeType: h.change_type,
-          price: h.price,
-          prevPrice,
-          rate,
-          recordedAt: h.recorded_at,
-          title: prop?.article_name,
-          propertyType: prop?.property_type,
-          dealType: tradeMap[prop?.trade_type] ?? prop?.trade_type,
-        });
-
-        if (changes.length >= 10) break;
-      }
-
-      // 상승 우선, 그 안에서 변동률 높은 순
-      changes.sort((a, b) => {
-        if (a.changeType !== b.changeType) return a.changeType === "increase" ? -1 : 1;
-        return Math.abs(b.rate) - Math.abs(a.rate);
       });
-      setPriceChanges(changes);
-      setCachedPriceChanges(changes);
-      setPriceChangesLoading(false);
-    })();
   }, []);
 
   // 최근 저장된 매물 (컬렉션 entries에서 최신 5개)
