@@ -1,4 +1,4 @@
-export type PropertyType = "상가" | "건물" | "사무실" | "상가주택" | "상가건물" | "기타";
+export type PropertyType = "상가" | "건물" | "사무실" | "상가주택" | "기타";
 export type TradeStatus = "active" | "sold";
 export type PriceChange = "none" | "increase" | "decrease" | "new";
 export type DealType = "매매" | "전세" | "월세" | "단기임대";
