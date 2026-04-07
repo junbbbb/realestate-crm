@@ -37,7 +37,11 @@ function OfficeName() {
   const user = useAuthStore((s) => s.user);
   const officeName = user?.user_metadata?.office_name;
   if (!officeName) return null;
-  return <p className="text-xs text-sidebar-foreground/60 truncate">{officeName}</p>;
+  return (
+    <div className="mt-2.5 pt-2 border-t border-sidebar-border">
+      <p className="text-sm font-semibold text-sidebar-foreground truncate">{officeName}</p>
+    </div>
+  );
 }
 
 function OfficeNamePrompt() {
@@ -70,8 +74,8 @@ function OfficeNamePrompt() {
       <div className="bg-card border rounded-lg shadow-lg w-[340px] p-6 space-y-4">
         <div className="text-center">
           <img src="/logo.svg" alt="Best Mountain" className="h-12 mx-auto mb-2" />
-          <h2 className="text-lg font-bold" style={{ color: "#000000" }}>환영합니다!</h2>
-          <p className="text-sm text-muted-foreground mt-1">부동산 이름을 입력해주세요</p>
+          <h2 className="text-lg font-bold">환영합니다!</h2>
+          <p className="text-sm text-muted-foreground mt-1">중개소 이름을 입력해주세요</p>
         </div>
         <input
           autoFocus
@@ -84,10 +88,15 @@ function OfficeNamePrompt() {
         <button
           onClick={handleSave}
           disabled={!name.trim()}
-          className="w-full h-10 rounded-lg text-white font-medium disabled:opacity-40"
-          style={{ backgroundColor: "#3585B0" }}
+          className="w-full h-10 rounded-lg bg-foreground text-background font-medium disabled:opacity-40"
         >
           시작하기
+        </button>
+        <button
+          onClick={() => setShow(false)}
+          className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          나중에 할게요
         </button>
       </div>
     </div>
@@ -118,13 +127,15 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         <aside className="hidden md:flex shrink-0 bg-sidebar border-r border-sidebar-border flex-col w-14 xl:w-56 transition-all duration-200">
           <div className="p-3 xl:p-6">
             <Link href="/" className="text-sidebar-foreground">
-              <div className="hidden xl:flex flex-col items-center">
-                <img src="/logo.svg" alt="Best Mountain" className="h-10 object-contain mb-1" />
-                <span className="text-sm tracking-widest" style={{ color: "#000000", fontFamily: "'Black Han Sans', sans-serif" }}>BEST MOUNTAIN</span>
+              <div className="hidden xl:block">
+                <div className="flex items-center gap-1.5">
+                  <img src="/logo.svg" alt="Best Mountain" className="h-5 w-5 object-contain" />
+                  <span className="text-sm tracking-wider" style={{ fontFamily: "Montserrat, sans-serif", fontWeight: 900 }}>BEST MOUNTAIN</span>
+                </div>
                 <OfficeName />
               </div>
               <div className="xl:hidden flex items-center justify-center">
-                <img src="/logo.svg" alt="Best Mountain" className="h-8 w-8 object-contain" />
+                <img src="/logo.svg" alt="Best Mountain" className="h-7 w-7 object-contain" />
               </div>
             </Link>
           </div>

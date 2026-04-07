@@ -2,7 +2,8 @@
 
 import { useSettingsStore, YieldCalcMethod, CrawlLog } from "@/lib/settings-store";
 import { useStore } from "@/lib/store";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useAuthStore } from "@/runtime/stores/auth-store";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -19,10 +20,30 @@ import { PIN_USER_ID } from "@/config/constants";
 function AccountSection() {
   const { user, userId } = useAuth();
   const router = useRouter();
-  const name = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0];
+  const meta = user?.user_metadata || {};
+  const currentName = meta.full_name || meta.name || user?.email?.split("@")[0] || "";
+  const currentOffice = meta.office_name || "";
   const email = user?.email;
-  const avatar = user?.user_metadata?.avatar_url || user?.user_metadata?.picture;
+  const avatar = meta.avatar_url || meta.picture;
   const isPinUser = userId === PIN_USER_ID;
+
+  const [editingName, setEditingName] = useState(false);
+  const [editingOffice, setEditingOffice] = useState(false);
+  const [nameValue, setNameValue] = useState(currentName);
+  const [officeValue, setOfficeValue] = useState(currentOffice);
+  const [saving, setSaving] = useState(false);
+
+  async function updateMeta(data: Record<string, string>) {
+    setSaving(true);
+    const { createSupabaseBrowserClient } = await import("@/lib/supabase-auth");
+    const supabase = createSupabaseBrowserClient();
+    await supabase.auth.updateUser({ data });
+    const { data: { user: updated } } = await supabase.auth.getUser();
+    if (updated) useAuthStore.getState().setAuth(updated.id, updated);
+    setSaving(false);
+    const { useToastStore } = await import("@/lib/toast-store");
+    useToastStore.getState().show("저장되었습니다");
+  }
 
   return (
     <div className="space-y-4">
@@ -31,7 +52,8 @@ function AccountSection() {
         <h2 className="text-lg font-semibold">계정</h2>
       </div>
 
-      <div className="bg-card rounded-lg border p-4">
+      <div className="bg-card rounded-lg border p-4 space-y-4">
+        {/* 프로필 + 로그아웃 */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             {avatar ? (
@@ -39,14 +61,13 @@ function AccountSection() {
             ) : (
               <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center">
                 <span className="text-sm font-bold text-muted-foreground">
-                  {name ? name[0].toUpperCase() : "P"}
+                  {currentName ? currentName[0].toUpperCase() : "P"}
                 </span>
               </div>
             )}
             <div>
-              <p className="font-medium">{name || (isPinUser ? "PIN 사용자" : "사용자")}</p>
+              <p className="font-medium">{currentName || (isPinUser ? "PIN 사용자" : "사용자")}</p>
               {email && <p className="text-sm text-muted-foreground">{email}</p>}
-              {isPinUser && <p className="text-xs text-muted-foreground">PIN 로그인</p>}
             </div>
           </div>
           <Button
@@ -65,6 +86,73 @@ function AccountSection() {
             로그아웃
           </Button>
         </div>
+
+        {/* 이름 변경 */}
+        {!isPinUser && (
+          <div className="space-y-3 pt-3 border-t">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">이름</p>
+              {editingName ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    autoFocus
+                    value={nameValue}
+                    onChange={(e) => setNameValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && nameValue.trim()) {
+                        updateMeta({ full_name: nameValue.trim(), name: nameValue.trim() });
+                        setEditingName(false);
+                      }
+                      if (e.key === "Escape") { setEditingName(false); setNameValue(currentName); }
+                    }}
+                    className="flex-1 h-8 rounded-md border px-2 text-sm outline-none focus:ring-1 focus:ring-primary"
+                  />
+                  <Button size="sm" className="h-8 text-xs" disabled={saving || !nameValue.trim()} onClick={() => {
+                    updateMeta({ full_name: nameValue.trim(), name: nameValue.trim() });
+                    setEditingName(false);
+                  }}>{saving ? "저장 중..." : "저장"}</Button>
+                  <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setEditingName(false); setNameValue(currentName); }}>취소</Button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">{currentName || "미설정"}</p>
+                  <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => { setNameValue(currentName); setEditingName(true); }}>변경</Button>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">부동산 이름</p>
+              {editingOffice ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    autoFocus
+                    value={officeValue}
+                    onChange={(e) => setOfficeValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && officeValue.trim()) {
+                        updateMeta({ office_name: officeValue.trim() });
+                        setEditingOffice(false);
+                      }
+                      if (e.key === "Escape") { setEditingOffice(false); setOfficeValue(currentOffice); }
+                    }}
+                    className="flex-1 h-8 rounded-md border px-2 text-sm outline-none focus:ring-1 focus:ring-primary"
+                  />
+                  <Button size="sm" className="h-8 text-xs" disabled={saving || !officeValue.trim()} onClick={() => {
+                    updateMeta({ office_name: officeValue.trim() });
+                    setEditingOffice(false);
+                  }}>{saving ? "저장 중..." : "저장"}</Button>
+                  <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setEditingOffice(false); setOfficeValue(currentOffice); }}>취소</Button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">{currentOffice || "미설정"}</p>
+                  <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => { setOfficeValue(currentOffice); setEditingOffice(true); }}>변경</Button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

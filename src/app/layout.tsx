@@ -23,7 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Montserrat:wght@900&display=swap"
         />
       </head>
       <body className="antialiased">

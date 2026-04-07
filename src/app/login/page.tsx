@@ -41,7 +41,7 @@ export default function LoginPage() {
         {/* 로고 + 브랜드 */}
         <div className="text-center">
           <img src="/logo.svg" alt="Best Mountain" className="h-20 mx-auto mb-3" />
-          <h1 className="text-2xl tracking-widest" style={{ color: BRAND_COLOR, fontFamily: "'Black Han Sans', sans-serif" }}>
+          <h1 className="text-2xl tracking-widest" style={{ color: BRAND_COLOR, fontFamily: "Montserrat, sans-serif", fontWeight: 900 }}>
             BEST MOUNTAIN
           </h1>
           <p className="text-sm text-muted-foreground mt-3 italic leading-relaxed">

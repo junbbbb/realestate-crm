@@ -22,7 +22,6 @@ function DashboardGreeting() {
       <h1 className="text-2xl md:text-3xl font-bold">
         {name ? `${name}님, 안녕하세요` : isPinUser ? "대시보드" : "대시보드"}
       </h1>
-      {name && <p className="text-sm text-muted-foreground mt-0.5">{user?.email}</p>}
     </div>
   );
 }
