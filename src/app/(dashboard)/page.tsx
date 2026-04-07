@@ -69,6 +69,7 @@ export default function Dashboard() {
   const myListings = useMemo(() => properties.filter((p) => p.isMyListing), [properties]);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [priceChangesLoading, setPriceChangesLoading] = useState(true);
+  const [priceChangesUpdatedAt, setPriceChangesUpdatedAt] = useState<string | null>(null);
 
   const openProperty = async (id: string) => {
     const local = properties.find((p) => p.id === id);
@@ -95,7 +96,8 @@ export default function Dashboard() {
       .select("*")
       .order("rate", { ascending: false })
       .then(({ data }) => {
-        setPriceChanges((data || []).map((r) => ({
+        const rows = data || [];
+        setPriceChanges(rows.map((r) => ({
           articleNo: r.article_no,
           changeType: r.change_type,
           price: r.current_price,
@@ -105,6 +107,7 @@ export default function Dashboard() {
           propertyType: r.property_type,
           dealType: r.trade_type,
         })));
+        if (rows.length > 0) setPriceChangesUpdatedAt(rows[0].updated_at);
         setPriceChangesLoading(false);
       });
   }, []);
@@ -190,12 +193,19 @@ export default function Dashboard() {
             {items.length === 0 && <p className="text-sm text-muted-foreground py-2">변동 없음</p>}
           </div>
         );
+        const updatedStr = priceChangesUpdatedAt ? (() => {
+          const d = new Date(priceChangesUpdatedAt);
+          return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")} 기준`;
+        })() : "";
         return (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="bg-card rounded-lg p-6">
-              <div className="flex items-center gap-2 text-sm font-medium text-red-500 mb-4">
-                <ArrowUpRight className="h-4 w-4" />
-                가격 상승 TOP
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-red-500">
+                  <ArrowUpRight className="h-4 w-4" />
+                  가격 상승 TOP
+                </div>
+                {updatedStr && <span className="text-[11px] text-muted-foreground">{updatedStr}</span>}
               </div>
               {renderList(increases, true)}
             </div>
