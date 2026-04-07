@@ -3,9 +3,6 @@ from urllib.parse import urlparse, parse_qs
 import json
 import os
 
-def handler(event, context):
-    pass
-
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -53,8 +50,8 @@ class handler(BaseHTTPRequestHandler):
             basic_url = f"{base}/basicInfo?articleNumber={article}&realEstateType={real_estate}&tradeType={trade}"
             agent_url = f"{base}/agent?articleNumber={article}"
 
-            basic_res = cffi_requests.get(basic_url, headers=headers, impersonate="chrome", timeout=10)
-            agent_res = cffi_requests.get(agent_url, headers=headers, impersonate="chrome", timeout=10)
+            basic_res = cffi_requests.get(basic_url, headers=headers, impersonate="chrome", timeout=15)
+            agent_res = cffi_requests.get(agent_url, headers=headers, impersonate="chrome", timeout=15)
 
             basic_json = basic_res.json() if basic_res.status_code == 200 else None
             agent_json = agent_res.json() if agent_res.status_code == 200 else None
