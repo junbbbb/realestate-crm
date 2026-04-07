@@ -27,14 +27,15 @@ export async function loadProperties(
       .select("*", { count: "exact" })
       .eq("is_active", true);
 
-    // 전체/네이버 탭: 남의 개인매물 숨기기 (is_my_listing=true인데 내 것 아닌 거)
-    if (filters.source !== "개인매물") {
-      // 네이버 매물(is_my_listing != true) + 내 개인매물만 표시
+    // 탭별 개인매물 필터링
+    if (filters.source === "네이버") {
+      // 네이버 탭: 개인매물 전부 숨김 (네이버 크롤링 데이터만)
+      query = query.or("is_my_listing.neq.true,is_my_listing.is.null");
+    } else if (filters.source !== "개인매물") {
+      // 전체 탭: 네이버 매물 + 내 개인매물만 (남의 개인매물 숨김)
       if (myListingIds.size > 0) {
-        // is_my_listing이 false/null이거나, 내 매물인 것만
         query = query.or(`is_my_listing.neq.true,is_my_listing.is.null,id.in.(${[...myListingIds].join(",")})`);
       } else {
-        // 내 개인매물 없으면 전체 개인매물 숨기기
         query = query.or("is_my_listing.neq.true,is_my_listing.is.null");
       }
     }
