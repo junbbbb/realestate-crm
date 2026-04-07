@@ -147,19 +147,35 @@ export async function loadProperties(
 // Load distinct dong list
 // ---------------------------------------------------------------------------
 export async function loadDongList(): Promise<string[]> {
-  const { data, error } = await supabase
-    .from("properties")
-    .select("dong")
-    .eq("is_active", true);
+  // Supabase 기본 1000행 제한 우회: 페이지네이션으로 전체 dong 수집
+  const allDongs = new Set<string>();
+  let from = 0;
+  const batchSize = 1000;
 
-  if (error) {
-    console.error("loadDongList error:", error);
-    return [];
+  while (true) {
+    const { data, error } = await supabase
+      .from("properties")
+      .select("dong")
+      .eq("is_active", true)
+      .range(from, from + batchSize - 1);
+
+    if (error) {
+      console.error("loadDongList error:", error);
+      break;
+    }
+
+    if (!data || data.length === 0) break;
+
+    for (const r of data) {
+      if (r.dong) allDongs.add(r.dong as string);
+    }
+
+    // 모든 dong을 찾았으면 (26개 동) 더 가져올 필요 없음
+    if (allDongs.size >= 26 || data.length < batchSize) break;
+    from += batchSize;
   }
 
-  return Array.from(
-    new Set((data || []).map((r: { dong: string }) => r.dong).filter(Boolean))
-  ).sort();
+  return [...allDongs].sort();
 }
 
 // ---------------------------------------------------------------------------
