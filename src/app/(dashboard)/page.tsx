@@ -5,10 +5,55 @@ import { useStore } from "@/lib/store";
 import { useCollectionStore } from "@/lib/collection-store";
 import { supabase } from "@/lib/supabase";
 import { formatMoney, formatPrice } from "@/lib/format";
-import { Building2, Heart, FolderOpen, Users, TrendingUp, TrendingDown, MapPin, Bookmark, Clock, ArrowUpRight, ArrowDownRight, X } from "lucide-react";
-import { DetailPanel } from "@/app/(dashboard)/properties/page";
+import { Building2, Heart, FolderOpen, Users, TrendingUp, TrendingDown, MapPin, Bookmark, Clock, ArrowUpRight, ArrowDownRight, X, Loader2 } from "lucide-react";
 import { mapSupabaseToProperty } from "@/lib/store";
 import { Property } from "@/types";
+
+function PriceHistoryPanel({ articleNo }: { articleNo: string }) {
+  const [history, setHistory] = useState<{ price: number; change_type: string; recorded_at: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    supabase
+      .from("price_history")
+      .select("price, change_type, recorded_at")
+      .eq("article_no", articleNo)
+      .order("recorded_at", { ascending: false })
+      .limit(20)
+      .then(({ data }) => {
+        setHistory(data || []);
+        setLoading(false);
+      });
+  }, [articleNo]);
+
+  if (loading) return <div className="flex-1 flex items-center justify-center"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>;
+  if (history.length === 0) return <p className="flex-1 text-sm text-muted-foreground">변동 이력 없음</p>;
+
+  return (
+    <div className="flex-1 overflow-y-auto space-y-1.5">
+      {history.map((h, i) => {
+        const date = new Date(h.recorded_at);
+        const dateStr = `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`;
+        const isUp = h.change_type === "increase";
+        const isDown = h.change_type === "decrease";
+        return (
+          <div key={i} className="flex items-center justify-between text-sm py-1 border-b border-border last:border-0">
+            <div className="flex items-center gap-2">
+              {isUp && <ArrowUpRight className="h-3.5 w-3.5 text-red-500" />}
+              {isDown && <ArrowDownRight className="h-3.5 w-3.5 text-blue-500" />}
+              {!isUp && !isDown && <div className="h-3.5 w-3.5 rounded-full bg-muted" />}
+              <span className="text-muted-foreground text-xs">{dateStr}</span>
+            </div>
+            <span className={`font-medium ${isUp ? "text-red-500" : isDown ? "text-blue-500" : ""}`}>
+              {formatMoney(h.price)}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const properties = useStore((s) => s.properties);
@@ -279,11 +324,63 @@ export default function Dashboard() {
           )}
         </div>
       </div>
-      {/* 매물 상세 모달 */}
+      {/* 매물 상세 모달 — 가로형 */}
       {selectedProperty && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setSelectedProperty(null)}>
-          <div className="w-full max-w-[420px] max-h-[85vh] mx-4" onClick={(e) => e.stopPropagation()}>
-            <DetailPanel property={selectedProperty} onClose={() => setSelectedProperty(null)} />
+          <div className="w-full max-w-[900px] max-h-[80vh] mx-4 bg-card rounded-xl shadow-2xl overflow-hidden flex" onClick={(e) => e.stopPropagation()}>
+            {/* 왼쪽: 핵심 정보 */}
+            <div className="flex-1 p-6 overflow-y-auto space-y-4">
+              <div>
+                <h2 className="text-xl font-bold">{selectedProperty.title}</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">{selectedProperty.propertyType} · {selectedProperty.address}</p>
+              </div>
+              <div className="bg-secondary rounded-lg px-4 py-3">
+                <p className="text-lg font-bold">
+                  <span className="text-sm font-medium text-muted-foreground mr-1.5">{selectedProperty.dealType}</span>
+                  {formatPrice(selectedProperty)}
+                </p>
+                {selectedProperty.premiumKey && (
+                  <p className="text-xs text-muted-foreground mt-1">권리금: {formatMoney(selectedProperty.premiumKey)}</p>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="space-y-0.5">
+                  <p className="text-[11px] text-muted-foreground">면적</p>
+                  <p className="font-medium">{selectedProperty.areaLabel}</p>
+                </div>
+                {selectedProperty.floor && (
+                  <div className="space-y-0.5">
+                    <p className="text-[11px] text-muted-foreground">층</p>
+                    <p className="font-medium">{selectedProperty.floor}/{selectedProperty.totalFloors}층</p>
+                  </div>
+                )}
+              </div>
+              {selectedProperty.features.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedProperty.features.map((f, i) => (
+                    <span key={i} className="inline-flex items-center rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium">{f}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* 오른쪽: 가격 변동 이력 + 액션 */}
+            <div className="w-[300px] border-l border-border p-6 flex flex-col bg-secondary/30">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-bold">가격 변동 이력</h3>
+                <button onClick={() => setSelectedProperty(null)} className="text-muted-foreground hover:text-foreground">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <PriceHistoryPanel articleNo={selectedProperty.id} />
+              <div className="mt-auto pt-4 space-y-2">
+                <a
+                  href={`/properties?select=${selectedProperty.id}`}
+                  className="flex items-center justify-center h-9 w-full rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+                >
+                  상세 페이지로 이동
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       )}
