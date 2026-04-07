@@ -40,7 +40,8 @@ export default function LoginPage() {
             <span className="text-background text-3xl font-black">B</span>
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight">베스트공인중개</h1>
-          <p className="text-sm text-muted-foreground mt-2">당신의 한 통화가 누군가의 새 시작이 됩니다</p>
+          <p className="text-sm text-muted-foreground mt-2 italic">"부동산은 땅이 아니라 사람에게 투자하는 것이다"</p>
+          <p className="text-[10px] text-muted-foreground/60">— 도널드 브렌, 어바인 컴퍼니 회장</p>
           <p className="text-xs text-muted-foreground mt-3">비밀번호를 입력하세요</p>
         </div>
 
