@@ -37,6 +37,21 @@ const CACHE_TTL = 5 * 60 * 1000;
 
 const LOCAL_PROXY = "http://localhost:4000/naver-detail";
 
+async function fetchViaPythonProxy(articleNumber: string, realEstateType: string, tradeType: string) {
+  const url = `/api/naver-proxy?articleNumber=${articleNumber}&realEstateType=${realEstateType}&tradeType=${tradeType}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) throw new Error(`python proxy ${res.status}`);
+    const json = await res.json();
+    if (!json.basicInfo && !json.agentInfo) throw new Error("empty");
+    return json;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function fetchViaLocalProxy(articleNumber: string, realEstateType: string, tradeType: string) {
   const url = `${LOCAL_PROXY}?articleNumber=${articleNumber}&realEstateType=${realEstateType}&tradeType=${tradeType}`;
   const controller = new AbortController();
@@ -77,14 +92,19 @@ export async function fetchNaverDetail(
 
   let json;
   try {
-    // 1차: 로컬 프록시 (사무실 PC, 주거용 한국 IP)
-    json = await fetchViaLocalProxy(articleNumber, realEstateType, tradeType);
+    // 1차: Python API (curl_cffi Chrome 위장)
+    json = await fetchViaPythonProxy(articleNumber, realEstateType, tradeType);
   } catch {
     try {
-      // 2차: 서버 API route (Vercel → 터널)
-      json = await fetchViaServer(articleNumber, realEstateType, tradeType);
+      // 2차: 로컬 프록시 (사무실 PC, 주거용 한국 IP)
+      json = await fetchViaLocalProxy(articleNumber, realEstateType, tradeType);
     } catch {
-      return null;
+      try {
+        // 3차: 서버 API route
+        json = await fetchViaServer(articleNumber, realEstateType, tradeType);
+      } catch {
+        return null;
+      }
     }
   }
 
