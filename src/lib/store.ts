@@ -135,7 +135,8 @@ export const useStore = create<AppState>((set, get) => ({
     set({ loading: true });
     try {
       const { filters, page, pageSize } = get();
-      const { data: rows, count } = await propertyRepo.loadProperties(filters, page, pageSize);
+      const userId = useAuthStore.getState().userId;
+      const { data: rows, count } = await propertyRepo.loadProperties(filters, page, pageSize, userId);
 
       // Map base properties from DB rows
       const properties = rows.map(mapSupabaseToProperty);

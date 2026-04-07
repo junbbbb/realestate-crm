@@ -8,7 +8,8 @@ import { SupabaseProperty } from "@/lib/supabase";
 export async function loadProperties(
   filters: PropertyFilters,
   page: number,
-  pageSize: number
+  pageSize: number,
+  userId?: string | null
 ): Promise<{ data: SupabaseProperty[]; count: number }> {
   try {
     let query = supabase
@@ -81,11 +82,27 @@ export async function loadProperties(
       query = query.lte("monthly_rent", filters.rentMax * 10000);
     }
 
-    // source filter
-    if (filters.source === "네이버") {
-      query = query.or("is_my_listing.eq.false,is_my_listing.is.null");
-    } else if (filters.source === "개인매물") {
-      query = query.eq("is_my_listing", true);
+    // source filter — 개인매물은 user_listings 테이블에서 ID 가져와서 필터
+    if (filters.source === "개인매물" && userId) {
+      const { data: listings } = await supabase
+        .from("user_listings")
+        .select("property_id")
+        .eq("user_id", userId);
+      const listingIds = (listings || []).map((r: { property_id: string }) => r.property_id);
+      if (listingIds.length > 0) {
+        query = query.in("id", listingIds);
+      } else {
+        return { data: [], count: 0 };
+      }
+    } else if (filters.source === "네이버" && userId) {
+      const { data: listings } = await supabase
+        .from("user_listings")
+        .select("property_id")
+        .eq("user_id", userId);
+      const listingIds = (listings || []).map((r: { property_id: string }) => r.property_id);
+      if (listingIds.length > 0) {
+        query = query.not("id", "in", `(${listingIds.join(",")})`);
+      }
     }
 
     // sort
