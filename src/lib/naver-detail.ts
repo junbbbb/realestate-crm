@@ -39,9 +39,18 @@ const NAVER_BASE = "https://fin.land.naver.com/front-api/v1/article";
 
 async function fetchViaServer(articleNumber: string, realEstateType: string, tradeType: string) {
   const url = `/api/naver-detail?articleNumber=${articleNumber}&realEstateType=${realEstateType}&tradeType=${tradeType}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`server ${res.status}`);
-  return res.json();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000); // 5초 timeout
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) throw new Error(`server ${res.status}`);
+    const json = await res.json();
+    // 서버에서 데이터를 못 가져온 경우 (네이버 차단 등)
+    if (!json.basicInfo && !json.agentInfo) throw new Error("empty response");
+    return json;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function fetchDirectFromClient(articleNumber: string, realEstateType: string, tradeType: string) {
