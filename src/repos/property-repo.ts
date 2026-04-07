@@ -12,10 +12,36 @@ export async function loadProperties(
   userId?: string | null
 ): Promise<{ data: SupabaseProperty[]; count: number }> {
   try {
+    // 다른 유저의 개인매물 ID를 미리 가져와서 제외
+    let excludeIds: string[] = [];
+    if (userId && filters.source !== "개인매물") {
+      // is_my_listing=true인 전체 매물 중 내 것(user_listings)이 아닌 것을 제외
+      const { data: allMyListings } = await supabase
+        .from("properties")
+        .select("id")
+        .eq("is_my_listing", true);
+      const allListingIds = new Set((allMyListings || []).map((r: { id: string }) => r.id));
+
+      if (allListingIds.size > 0) {
+        const { data: myListings } = await supabase
+          .from("user_listings")
+          .select("property_id")
+          .eq("user_id", userId);
+        const myListingIds = new Set((myListings || []).map((r: { property_id: string }) => r.property_id));
+
+        excludeIds = [...allListingIds].filter((id) => !myListingIds.has(id));
+      }
+    }
+
     let query = supabase
       .from("properties")
       .select("*", { count: "exact" })
       .eq("is_active", true);
+
+    // 다른 유저의 개인매물 제외
+    if (excludeIds.length > 0) {
+      query = query.not("id", "in", `(${excludeIds.join(",")})`);
+    }
 
     // dong filter
     if (filters.dong.length > 0) {
