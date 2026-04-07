@@ -180,6 +180,11 @@ export function DetailPanel({ property, onClose, onMemoSaved }: { property: Prop
   const router = useRouter();
   const { containerRef, thumbRef } = useScrollReveal<HTMLDivElement>();
   const [tab, setTab] = useState<"info" | "area" | "legal" | "cost">("info");
+
+  // 매물 변경 시 상세 패널 스크롤 맨 위로
+  useEffect(() => {
+    containerRef.current?.scrollTo(0, 0);
+  }, [property.id]);
   const [detail, setDetail] = useState<NaverDetailInfo | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [memoValue, setMemoValue] = useState(property.memo ?? "");
