@@ -20,15 +20,22 @@ class handler(BaseHTTPRequestHandler):
             return
 
         cookie = os.environ.get("NAVER_COOKIE", "")
-        if not cookie:
+        proxy_user = os.environ.get("PROXY_USER", "")
+        proxy_pass = os.environ.get("PROXY_PASS", "")
+
+        if not cookie or not proxy_user or not proxy_pass:
             self.send_response(500)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
-            self.wfile.write(json.dumps({"error": "NAVER_COOKIE not set"}).encode())
+            self.wfile.write(json.dumps({"error": "env vars not set"}).encode())
             return
 
         try:
             from curl_cffi import requests as cffi_requests
+
+            proxies = {
+                "https": f"http://{proxy_user}:{proxy_pass}@gate.decodo.com:10001"
+            }
 
             headers = {
                 "accept": "application/json, text/plain, */*",
@@ -50,8 +57,8 @@ class handler(BaseHTTPRequestHandler):
             basic_url = f"{base}/basicInfo?articleNumber={article}&realEstateType={real_estate}&tradeType={trade}"
             agent_url = f"{base}/agent?articleNumber={article}"
 
-            basic_res = cffi_requests.get(basic_url, headers=headers, impersonate="chrome", timeout=15)
-            agent_res = cffi_requests.get(agent_url, headers=headers, impersonate="chrome", timeout=15)
+            basic_res = cffi_requests.get(basic_url, headers=headers, proxies=proxies, impersonate="chrome", timeout=15)
+            agent_res = cffi_requests.get(agent_url, headers=headers, proxies=proxies, impersonate="chrome", timeout=15)
 
             basic_json = basic_res.json() if basic_res.status_code == 200 else None
             agent_json = agent_res.json() if agent_res.status_code == 200 else None
