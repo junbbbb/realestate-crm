@@ -89,6 +89,7 @@ export default function Dashboard() {
     title?: string;
     propertyType?: string;
     dealType?: string;
+    dong?: string;
   }[]>([]);
 
   useEffect(() => {
@@ -107,6 +108,7 @@ export default function Dashboard() {
           title: r.article_name,
           propertyType: r.property_type,
           dealType: r.trade_type,
+          dong: r.dong,
         })));
         if (rows.length > 0) setPriceChangesUpdatedAt(rows[0].updated_at);
         setPriceChangesLoading(false);
@@ -175,11 +177,14 @@ export default function Dashboard() {
         const decreases = priceChanges.filter((c) => c.changeType === "decrease").sort((a, b) => a.rate - b.rate);
         const renderList = (items: typeof priceChanges, isUp: boolean) => (
           <div className="space-y-1">
-            {items.map((c) => (
+            {items.map((c, idx) => (
               <div key={c.articleNo} className="flex items-center justify-between py-1.5 border-b border-border last:border-0 cursor-pointer hover:bg-secondary/50 rounded-md px-1 -mx-1 transition-colors" onClick={() => openProperty(c.articleNo)}>
-                <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="text-xs font-bold text-muted-foreground w-4 shrink-0">{idx + 1}</span>
+                  <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{c.title || c.articleNo}</p>
-                  <p className="text-[11px] text-muted-foreground">{c.propertyType} · {c.dealType}</p>
+                  <p className="text-[11px] text-muted-foreground">{c.dong && `${c.dong} · `}{c.propertyType} · {c.dealType}</p>
+                  </div>
                 </div>
                 <div className="text-right shrink-0 ml-3">
                   <p className={`text-sm font-bold ${isUp ? "text-red-500" : "text-blue-500"}`}>
