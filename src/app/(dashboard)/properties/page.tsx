@@ -194,7 +194,7 @@ function DetailPriceHistory({ articleNo }: { articleNo: string }) {
     <div className="text-center py-12">
       <TrendingUp className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
       <p className="text-sm text-muted-foreground">가격 변동 이력이 없습니다</p>
-      <p className="text-xs text-muted-foreground mt-1">크롤링 시 가격 변동이 감지되면 기록됩니다</p>
+      <p className="text-xs text-muted-foreground/70 mt-1">가격이 변동된 경우에만 기록됩니다</p>
     </div>
   );
 
