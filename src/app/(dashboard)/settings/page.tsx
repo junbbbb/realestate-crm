@@ -1,7 +1,8 @@
 "use client";
 
-import { useSettingsStore, YieldCalcMethod, CrawlLog } from "@/lib/settings-store";
+import { useSettingsStore, YieldCalcMethod } from "@/lib/settings-store";
 import { useStore } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@/runtime/stores/auth-store";
 import {
@@ -180,14 +181,30 @@ export default function SettingsPage() {
     defaultDong, setDefaultDong,
     defaultPropertyType, setDefaultPropertyType,
     defaultDealType, setDefaultDealType,
-    crawlLogs, clearCrawlLogs,
   } = useSettingsStore();
 
   const dongList = useStore((s) => s.dongList);
   const loadDongList = useStore((s) => s.loadDongList);
 
+  const [crawlLogs, setCrawlLogs] = useState<{ id: string; timestamp: string; status: string; totalCount: number; newCount: number; updatedCount: number; duration: string; message: string }[]>([]);
+  const [logsLoading, setLogsLoading] = useState(true);
+
   useEffect(() => {
     loadDongList();
+    supabase.from("crawl_logs").select("*").order("timestamp", { ascending: false }).limit(20)
+      .then(({ data }) => {
+        setCrawlLogs((data || []).map((r) => ({
+          id: r.id,
+          timestamp: r.timestamp,
+          status: r.status,
+          totalCount: r.total_count,
+          newCount: r.new_count,
+          updatedCount: r.updated_count,
+          duration: r.duration || "",
+          message: r.message || "",
+        })));
+        setLogsLoading(false);
+      });
   }, [loadDongList]);
 
   return (
@@ -309,15 +326,16 @@ export default function SettingsPage() {
             <Database className="h-5 w-5 text-muted-foreground" />
             <h2 className="text-lg font-semibold">크롤링 로그</h2>
           </div>
-          {crawlLogs.length > 0 && (
-            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={clearCrawlLogs}>
-              <Trash2 className="h-3.5 w-3.5 mr-1" />로그 삭제
-            </Button>
-          )}
+          <span className="text-xs text-muted-foreground">{crawlLogs.length > 0 ? `${crawlLogs.length}건` : ""}</span>
         </div>
 
         <div className="bg-card border rounded-lg">
-          {crawlLogs.length === 0 ? (
+          {logsLoading ? (
+            <div className="p-8 text-center">
+              <Clock className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3 animate-pulse" />
+              <p className="text-sm text-muted-foreground">로그 불러오는 중...</p>
+            </div>
+          ) : crawlLogs.length === 0 ? (
             <div className="p-8 text-center">
               <Clock className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
               <p className="text-sm text-muted-foreground">크롤링 로그가 없습니다</p>
