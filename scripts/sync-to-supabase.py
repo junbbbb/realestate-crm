@@ -275,7 +275,7 @@ def main():
         rate = ((cur_conv - prev_conv) / prev_conv * 100) if prev_conv else 0
         rankings.append({
             "article_no": r["id"],
-            "article_name": r.get("article_name", ""),
+            "article_name": r.get("description") or r.get("article_name", ""),
             "property_type": r.get("property_type", ""),
             "trade_type": trade_map.get(r.get("trade_type", ""), r.get("trade_type_name", "")),
             "trade_type_code": r.get("trade_type", ""),
