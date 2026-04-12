@@ -33,15 +33,17 @@ function formatPriceDisplay(warrant: number, rent: number, tradeType?: string): 
   return formatMoney(warrant || 0);
 }
 
+const TRADE_LABEL: Record<string, string> = { A1: "매매", B1: "전세", B2: "월세", B3: "단기" };
+
 function PriceHistoryPanel({ articleNo }: { articleNo: string }) {
-  const [history, setHistory] = useState<{ price: number; change_type: string; recorded_at: string; warrant_price: number; monthly_rent: number }[]>([]);
+  const [history, setHistory] = useState<{ price: number; change_type: string; recorded_at: string; warrant_price: number; monthly_rent: number; trade_type: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
     supabase
       .from("price_history")
-      .select("price, change_type, recorded_at, warrant_price, monthly_rent")
+      .select("price, change_type, recorded_at, warrant_price, monthly_rent, trade_type")
       .eq("article_no", articleNo)
       .order("recorded_at", { ascending: false })
       .limit(20)
@@ -69,7 +71,7 @@ function PriceHistoryPanel({ articleNo }: { articleNo: string }) {
             <div className="flex items-center gap-2">
               {isUp && <ArrowUpRight className="h-3.5 w-3.5 text-red-500" />}
               {isDown && <ArrowDownRight className="h-3.5 w-3.5 text-blue-500" />}
-              {isTypeChange && <span className="text-[10px] text-orange-500 font-medium">전환</span>}
+              {isTypeChange && <span className="text-[10px] text-orange-500 font-medium">{h.trade_type ? TRADE_LABEL[h.trade_type] || "전환" : "전환"}</span>}
               {!isUp && !isDown && !isTypeChange && <div className="h-3.5 w-3.5 rounded-full bg-muted" />}
               <span className="text-muted-foreground text-xs">{dateStr}</span>
             </div>

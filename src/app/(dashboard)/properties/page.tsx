@@ -19,6 +19,7 @@ import {
   Heart, Search, RotateCcw, Inbox, X, MapPin, Ruler, BedDouble, Building, Phone,
   TrendingUp, Store, Users, FileText, BarChart3, Scale, Calculator, Plus, Bookmark,
   Car, Bath, Flame, CalendarCheck, Loader2, KeyRound, ExternalLink, StickyNote, Handshake, Trash2, RefreshCw,
+  ArrowUpRight, ArrowDownRight, Info,
 } from "lucide-react";
 import {
   fetchNaverDetail, NaverDetailInfo,
@@ -167,6 +168,90 @@ function StartDealModal({ property, sellers, buyers, onConfirm, onClose }: {
   );
 }
 
+const TRADE_LABEL: Record<string, string> = { A1: "매매", B1: "전세", B2: "월세", B3: "단기" };
+
+function DetailPriceHistory({ articleNo }: { articleNo: string }) {
+  const [history, setHistory] = useState<{ price: number; change_type: string; recorded_at: string; warrant_price: number; monthly_rent: number; deal_or_warrant_price: string; trade_type: string | null }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    supabase
+      .from("price_history")
+      .select("price, change_type, recorded_at, warrant_price, monthly_rent, deal_or_warrant_price, trade_type")
+      .eq("article_no", articleNo)
+      .order("recorded_at", { ascending: false })
+      .limit(50)
+      .then(({ data }) => {
+        setHistory(data || []);
+        setLoading(false);
+      });
+  }, [articleNo]);
+
+  if (loading) return <div className="flex items-center justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
+
+  if (history.length === 0) return (
+    <div className="text-center py-12">
+      <TrendingUp className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
+      <p className="text-sm text-muted-foreground">가격 변동 이력이 없습니다</p>
+      <p className="text-xs text-muted-foreground mt-1">크롤링 시 가격 변동이 감지되면 기록됩니다</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-sm font-medium">
+          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          가격 변동 이력
+        </div>
+        <div className="relative group">
+          <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+          <div className="absolute top-full right-0 mt-1 hidden group-hover:block z-10 w-56 bg-popover text-popover-foreground text-[11px] rounded-md shadow-lg border border-border p-2.5 leading-relaxed">
+            <p className="font-medium mb-1">환산보증금 기준 비교</p>
+            <p>월세: 보증금 + (월세 x 12 / 0.06)</p>
+            <p className="mt-1 text-muted-foreground">전환율 6% (마포구 상업용)</p>
+          </div>
+        </div>
+      </div>
+      <div className="space-y-1">
+        {history.map((h, i) => {
+          const date = new Date(h.recorded_at);
+          const dateStr = `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`;
+          const isUp = h.change_type === "increase";
+          const isDown = h.change_type === "decrease";
+          const isTypeChange = h.change_type === "type_change";
+          const isInitial = h.change_type === "initial";
+          const rent = h.monthly_rent || 0;
+          const warrant = h.warrant_price || 0;
+          const priceDisplay = rent > 0 ? `${formatMoney(warrant)}/${formatMoney(rent)}` : formatMoney(h.price);
+
+          return (
+            <div key={i} className="flex items-center justify-between py-2 px-2 border-b border-border last:border-0 rounded-md hover:bg-secondary/50 transition-colors">
+              <div className="flex items-center gap-2.5">
+                {isUp && <ArrowUpRight className="h-4 w-4 text-red-500" />}
+                {isDown && <ArrowDownRight className="h-4 w-4 text-blue-500" />}
+                {isTypeChange && <span className="text-[10px] text-orange-500 font-bold px-1">{h.trade_type ? TRADE_LABEL[h.trade_type] || "전환" : "전환"}</span>}
+                {isInitial && <div className="h-4 w-4 rounded-full bg-green-500/20 flex items-center justify-center"><div className="h-1.5 w-1.5 rounded-full bg-green-500" /></div>}
+                {!isUp && !isDown && !isTypeChange && !isInitial && <div className="h-4 w-4 rounded-full bg-muted" />}
+                <div>
+                  <p className="text-sm text-muted-foreground">{dateStr}</p>
+                  <p className="text-[11px] text-muted-foreground/70">
+                    {isInitial ? `최초 등록${h.trade_type ? ` (${TRADE_LABEL[h.trade_type] || h.trade_type})` : ""}` : isTypeChange ? `→ ${h.trade_type ? TRADE_LABEL[h.trade_type] || h.trade_type : "거래유형 변경"}` : isUp ? "가격 상승" : isDown ? "가격 하락" : "변동 없음"}
+                  </p>
+                </div>
+              </div>
+              <span className={`text-sm font-medium ${isUp ? "text-red-500" : isDown ? "text-blue-500" : isTypeChange ? "text-orange-500" : ""}`}>
+                {priceDisplay}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function DetailPanel({ property, onClose, onMemoSaved }: { property: Property; onClose: () => void; onMemoSaved?: (id: string, memo: string) => void }) {
   const toggleFavorite = useStore((s) => s.toggleFavorite);
   const saveMemo = useStore((s) => s.saveMemo);
@@ -179,7 +264,7 @@ export function DetailPanel({ property, onClose, onMemoSaved }: { property: Prop
   const loadProperties = useStore((s) => s.loadProperties);
   const router = useRouter();
   const { containerRef, thumbRef } = useScrollReveal<HTMLDivElement>();
-  const [tab, setTab] = useState<"info" | "area" | "legal" | "cost">("info");
+  const [tab, setTab] = useState<"info" | "area" | "cost" | "history">("info");
 
   // 매물 변경 시 상세 패널 스크롤 맨 위로
   useEffect(() => {
@@ -211,8 +296,8 @@ export function DetailPanel({ property, onClose, onMemoSaved }: { property: Prop
   const tabs = [
     { id: "info" as const, label: "기본" },
     { id: "area" as const, label: "상권" },
-    { id: "legal" as const, label: "권리" },
     { id: "cost" as const, label: "비용" },
+    { id: "history" as const, label: "변동" },
   ];
 
   return (
@@ -568,8 +653,14 @@ export function DetailPanel({ property, onClose, onMemoSaved }: { property: Prop
         )}
 
         {/* Tab: 권리 */}
-        {tab === "legal" && (
+        {/* Tab: 비용 (권리 + 비용 통합) */}
+        {tab === "cost" && (
           <div className="space-y-5">
+            <CostSimulator property={property} />
+
+            <Separator />
+
+            {/* 등기부등본 */}
             <div className="space-y-2">
               <div className="flex items-center gap-1.5 text-sm font-medium"><FileText className="h-4 w-4 text-muted-foreground" />등기부등본</div>
               <div className="rounded-lg border p-3 space-y-3">
@@ -650,13 +741,6 @@ export function DetailPanel({ property, onClose, onMemoSaved }: { property: Prop
               <div className="flex items-center gap-1.5 text-sm font-medium"><Building className="h-4 w-4 text-muted-foreground" />건물 메모</div>
               <textarea placeholder="수선 필요 사항, 건물 상태, 주차 공간 등..." defaultValue={property.buildingMemo ?? ""} className="w-full text-sm border rounded-md p-3 resize-none h-[80px] focus:outline-none placeholder:text-muted-foreground" />
             </div>
-          </div>
-        )}
-
-        {/* Tab: 비용 */}
-        {tab === "cost" && (
-          <div className="space-y-5">
-            <CostSimulator property={property} />
 
             <Separator />
 
@@ -671,6 +755,11 @@ export function DetailPanel({ property, onClose, onMemoSaved }: { property: Prop
               </div>
             </div>
           </div>
+        )}
+
+        {/* Tab: 변동 (가격 히스토리) */}
+        {tab === "history" && (
+          <DetailPriceHistory articleNo={property.id} />
         )}
       </div>
       </div>

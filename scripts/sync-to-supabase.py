@@ -167,6 +167,7 @@ def main():
                 "monthly_rent": row["monthly_rent"],
                 "price": row["price"],
                 "change_type": "initial",
+                "trade_type": row["trade_type"],
             })
         else:
             prev_trade = prev.get("trade_type") or ""
@@ -186,6 +187,7 @@ def main():
                     "monthly_rent": row["monthly_rent"],
                     "price": row["price"],
                     "change_type": "type_change",
+                    "trade_type": row["trade_type"],
                 })
                 continue
 
@@ -208,6 +210,7 @@ def main():
                     "monthly_rent": row["monthly_rent"],
                     "price": row["price"],
                     "change_type": change_type,
+                    "trade_type": row["trade_type"],
                 })
             else:
                 row["price_change"] = "none"

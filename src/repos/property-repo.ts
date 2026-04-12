@@ -64,10 +64,10 @@ export async function loadProperties(
       query = query.eq("trade_type_name", filters.dealType);
     }
 
-    // search (description / address / article_name)
+    // search (description / address / article_name / article_no)
     if (filters.search) {
       query = query.or(
-        `description.ilike.%${filters.search}%,address.ilike.%${filters.search}%,article_name.ilike.%${filters.search}%`
+        `description.ilike.%${filters.search}%,address.ilike.%${filters.search}%,article_name.ilike.%${filters.search}%,article_no.ilike.%${filters.search}%`
       );
     }
 
