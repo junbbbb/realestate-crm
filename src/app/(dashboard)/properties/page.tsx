@@ -315,6 +315,7 @@ export function DetailPanel({ property, onClose, onMemoSaved }: { property: Prop
           <div>
             <h2 className="text-xl font-bold">{property.title}</h2>
             <p className="text-sm text-muted-foreground mt-0.5">{property.propertyType} · {property.address}</p>
+            <p className="text-xs text-muted-foreground/60 mt-0.5">매물번호 {property.id}</p>
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
             <X className="h-5 w-5" />
