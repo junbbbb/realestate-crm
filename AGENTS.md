@@ -88,8 +88,8 @@ src/
     api/
       auth/                  -- PIN 로그인 API
       naver-detail/          -- 네이버 상세 API 프록시
-scripts/                     -- 크롤링 (crawl-mapo-fin.py, sync-to-supabase.py 등)
-supabase/migrations/         -- DB 마이그레이션 SQL (21개)
+scripts/                     -- 크롤링 (crawl-mapo-fin.py, sync-to-supabase.py, run-crawl.sh 등)
+supabase/migrations/         -- DB 마이그레이션 SQL (23개)
 docs/                        -- 프로젝트 문서
 ```
 
@@ -97,8 +97,8 @@ docs/                        -- 프로젝트 문서
 
 ### 공유 데이터 (모든 유저 공통)
 - `properties` -- 매물 (크롤링 + 개인등록)
-- `price_history` -- 가격 변동 추적
-- `price_change_rankings` -- 가격 변동 TOP 6 상승/하락
+- `price_history` -- 가격 변동 추적 (trade_type 포함, 변동 시에만 기록)
+- `price_change_rankings` -- 가격 변동 TOP 6 상승/하락 (환산보증금 기준, 보증금/월세 상세 포함)
 - `naver_detail_cache` -- 네이버 상세 API 캐시 (24h TTL)
 - `crawl_logs` -- 크롤링 로그
 
@@ -128,6 +128,25 @@ docs/                        -- 프로젝트 문서
 - `docs/decisions/design-decisions.md` -- 설계 결정 + 시행착오
 - `docs/decisions/naver-detail-api.md` -- 네이버 API 선택 과정
 - `docs/DOCUMENTATION.md` -- 각 문서의 역할과 갱신 시점
+
+## 가격 비교 로직 (환산보증금)
+
+가격 변동 감지 시 거래유형별 비교 기준:
+- **매매(A1)**: 매매가 그대로
+- **전세(B1)**: 보증금 그대로
+- **월세(B2)/단기(B3)**: 환산보증금 = 보증금 + (월세 × 12 ÷ 0.06) — 전환율 6% (마포구 상업용 기준)
+
+### 가격 변동 감지 규칙
+- DB 현재값(직전 크롤링) vs 이번 크롤링값 비교
+- **거래유형 변경**(전세→매매 등): `type_change`로 분류, 랭킹 제외
+- **환산보증금 변동**: `increase`/`decrease`로 분류
+- **변동 없음**: price_history에 기록하지 않음 (last_seen_at만 갱신)
+- **비활성화**: 7일 미확인 매물 → is_active=false (1000건씩 배치)
+
+### 크롤링 파이프라인 (run-crawl.sh)
+1. Chrome 네이버 쿠키 자동 추출 → .env.local
+2. crawl-mapo-fin.py → 매물 목록 크롤링 (상세 조회 없음, 별도 API로 처리)
+3. sync-to-supabase.py → DB upsert + 가격 변동 감지 + 랭킹 갱신 + 비활성화
 
 ## 가격 단위 주의
 - DB: 원 단위 (500000000 = 5억)

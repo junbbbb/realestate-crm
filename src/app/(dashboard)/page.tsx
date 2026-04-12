@@ -104,6 +104,14 @@ export default function Dashboard() {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [priceChangesLoading, setPriceChangesLoading] = useState(true);
   const [priceChangesUpdatedAt, setPriceChangesUpdatedAt] = useState<string | null>(null);
+  const [lastCrawlAt, setLastCrawlAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.from("crawl_logs").select("timestamp").eq("status", "success").order("timestamp", { ascending: false }).limit(1)
+      .then(({ data }) => {
+        if (data && data.length > 0) setLastCrawlAt(data[0].timestamp);
+      });
+  }, []);
 
   const openProperty = async (id: string) => {
     const local = properties.find((p) => p.id === id);
@@ -178,7 +186,14 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <DashboardGreeting />
+      <div className="flex items-center justify-between">
+        <DashboardGreeting />
+        {lastCrawlAt && (
+          <p className="text-xs text-muted-foreground">
+            최근 업데이트: {(() => { const d = new Date(lastCrawlAt); return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; })()}
+          </p>
+        )}
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

@@ -8,6 +8,7 @@
 import json
 import os
 import sys
+import time
 from datetime import datetime, timezone, timedelta
 from supabase import create_client
 from dotenv import load_dotenv
@@ -122,6 +123,7 @@ def map_fin_article(item, dong=None):
 
 
 def main():
+    start_time = time.time()
     data_file = sys.argv[1] if len(sys.argv) > 1 else "data/crawled-mangwon-fin.json"
 
     with open(data_file, "r", encoding="utf-8") as f:
@@ -300,9 +302,25 @@ def main():
         except Exception as e:
             print(f"  랭킹 에러: {e}")
 
-    # 최종 확인
-    active = supabase.table("properties").select("id", count="exact").eq("is_active", True).execute()
-    print(f"\n=== 활성 매물: {active.count}건 ===")
+    # 크롤링 로그 기록
+    duration = f"{time.time() - start_time:.1f}s"
+    new_count = len([r for r in price_history_rows if r.get("change_type") == "initial"])
+    updated_count = len([r for r in price_history_rows if r.get("change_type") in ("increase", "decrease", "type_change")])
+    log_msg = f"총 {len(rows)}건 upsert, 신규 {new_count}건, 변동 {updated_count}건, 비활성화 {deactivated}건"
+    try:
+        supabase.table("crawl_logs").insert({
+            "status": "success",
+            "total_count": len(rows),
+            "new_count": new_count,
+            "updated_count": updated_count,
+            "duration": duration,
+            "message": log_msg,
+        }).execute()
+        print(f"  크롤링 로그 기록: {log_msg} ({duration})")
+    except Exception as e:
+        print(f"  크롤링 로그 에러: {e}")
+
+    print(f"\n=== 완료: {log_msg} ===")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-# BEST MOUNTAIN 프로젝트 현황 (2026-04-06)
+# BEST MOUNTAIN 프로젝트 현황 (2026-04-13)
 
 ## 개요
 부동산 중개인을 위한 서울시 마포구 상업용 부동산 매물 관리 CRM.
@@ -123,10 +123,15 @@ PK: (user_id, property_id)
 PK: user_id -- page_size, yield_calc_method, default_dong/property_type/deal_type
 
 ### price_history (가격 변동) -- 공유
-article_no FK, price, warrant_price, monthly_rent, change_type (initial/increase/decrease)
+article_no FK, price, warrant_price, monthly_rent, trade_type, change_type (initial/increase/decrease/type_change)
+- 가격 변동이 있을 때만 기록 (변동 없으면 기록 안 함)
+- 환산보증금 기준 비교: 보증금 + (월세 × 12 ÷ 0.06) — 전환율 6%
+- 거래유형 변경(전세→매매 등)은 type_change로 별도 분류
 
 ### price_change_rankings (가격 변동 랭킹) -- 공유
 article_no, change_type (increase/decrease), prev_price, current_price, rate, dong
+trade_type_code, warrant_price, monthly_rent, prev_warrant_price, prev_monthly_rent
+- 환산보증금 기준 상승/하락률 정렬, 거래유형 변경은 제외
 
 ### naver_detail_cache (상세 캐시) -- 공유
 article_number PK, data (jsonb), fetched_at -- 24h TTL
@@ -140,8 +145,8 @@ status, total_count, new_count, updated_count, duration, message
 
 ```
 /login               로그인 (Google OAuth / PIN)
-/                    대시보드 (통계, 가격변동 TOP, 최근매물/저장)
-/properties          매물 목록 (탭: 전체/네이버/개인매물)
+/                    대시보드 (통계, 가격변동 TOP(환산보증금+툴팁), 최근매물/저장)
+/properties          매물 목록 (탭: 전체/네이버/개인매물, 상세: 기본/상권/비용/변동)
 /favorites           저장한 매물 (컬렉션 카드, 삭제됨 탭)
 /my-listings         거래 관리 (칸반 드래그앤드롭)
 /customers           고객 관리 (역할: buyer/seller/both)
@@ -176,9 +181,10 @@ status, total_count, new_count, updated_count, duration, message
    -> data/crawled-mapo-fin-YYYY-MM-DD.json (~20,000건)
 
 2. sync-to-supabase.py -- JSON -> Supabase upsert
-   -> 가격 변동 감지 -> price_history 기록
-   -> 7일 미확인 -> is_active=false
-   -> 가격 변동 랭킹 계산 -> price_change_rankings 갱신
+   -> 환산보증금 기준 가격 변동 감지 -> price_history 기록
+   -> 거래유형 변경 감지 -> type_change 기록 (랭킹 제외)
+   -> 7일 미확인 -> is_active=false (1000건씩 배치)
+   -> 가격 변동 랭킹 계산 -> price_change_rankings 갱신 (보증금/월세 상세 포함)
 ```
 
 ### 매물 유형 7종 (realEstateTypes)
