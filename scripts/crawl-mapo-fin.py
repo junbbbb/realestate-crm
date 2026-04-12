@@ -214,34 +214,6 @@ def main():
     for dong, cnt in sorted(summary.items(), key=lambda x: -x[1]):
         print(f"  {dong}: {cnt}건")
 
-    # 상세 조회 (basicInfo + agent)
-    print(f"\n=== 상세 조회 시작 ({len(all_articles)}건) ===")
-    detail_ok = 0
-    detail_fail = 0
-    for i, item in enumerate(all_articles):
-        info = item.get("representativeArticleInfo", item)
-        article_no = info.get("articleNumber", "")
-        re_type = info.get("realEstateType", "")
-        trade_type = info.get("tradeType", "")
-
-        if not article_no:
-            continue
-
-        detail = fetch_detail(article_no, re_type, trade_type)
-        item["_detail"] = detail
-
-        if detail.get("basicInfo"):
-            detail_ok += 1
-        else:
-            detail_fail += 1
-
-        if (i + 1) % 100 == 0:
-            print(f"  상세 {i+1}/{len(all_articles)} (성공={detail_ok}, 실패={detail_fail})")
-
-        time.sleep(0.1)
-
-    print(f"  상세 완료: 성공={detail_ok}, 실패={detail_fail}")
-
     os.makedirs("data", exist_ok=True)
     out = f"data/crawled-mapo-fin-{datetime.now().strftime('%Y-%m-%d')}.json"
     with open(out, "w", encoding="utf-8") as f:

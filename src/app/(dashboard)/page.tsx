@@ -5,7 +5,7 @@ import { useStore } from "@/lib/store";
 import { useCollectionStore } from "@/lib/collection-store";
 import { supabase } from "@/lib/supabase";
 import { formatMoney, formatPrice } from "@/lib/format";
-import { Building2, FolderOpen, Users, MapPin, Bookmark, Clock, ArrowUpRight, ArrowDownRight, X, Loader2 } from "lucide-react";
+import { Building2, FolderOpen, Users, MapPin, Bookmark, Clock, ArrowUpRight, ArrowDownRight, X, Loader2, Info } from "lucide-react";
 import { mapSupabaseToProperty } from "@/lib/store";
 import { DetailPanel } from "@/app/(dashboard)/properties/page";
 import { Property } from "@/types";
@@ -26,15 +26,22 @@ function DashboardGreeting() {
   );
 }
 
+function formatPriceDisplay(warrant: number, rent: number, tradeType?: string): string {
+  if (tradeType === "B2" || tradeType === "B3" || (!tradeType && rent > 0)) {
+    return `${formatMoney(warrant)}/${formatMoney(rent)}`;
+  }
+  return formatMoney(warrant || 0);
+}
+
 function PriceHistoryPanel({ articleNo }: { articleNo: string }) {
-  const [history, setHistory] = useState<{ price: number; change_type: string; recorded_at: string }[]>([]);
+  const [history, setHistory] = useState<{ price: number; change_type: string; recorded_at: string; warrant_price: number; monthly_rent: number }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
     supabase
       .from("price_history")
-      .select("price, change_type, recorded_at")
+      .select("price, change_type, recorded_at, warrant_price, monthly_rent")
       .eq("article_no", articleNo)
       .order("recorded_at", { ascending: false })
       .limit(20)
@@ -54,16 +61,20 @@ function PriceHistoryPanel({ articleNo }: { articleNo: string }) {
         const dateStr = `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`;
         const isUp = h.change_type === "increase";
         const isDown = h.change_type === "decrease";
+        const isTypeChange = h.change_type === "type_change";
+        const rent = h.monthly_rent || 0;
+        const warrant = h.warrant_price || 0;
         return (
           <div key={i} className="flex items-center justify-between text-sm py-1 border-b border-border last:border-0">
             <div className="flex items-center gap-2">
               {isUp && <ArrowUpRight className="h-3.5 w-3.5 text-red-500" />}
               {isDown && <ArrowDownRight className="h-3.5 w-3.5 text-blue-500" />}
-              {!isUp && !isDown && <div className="h-3.5 w-3.5 rounded-full bg-muted" />}
+              {isTypeChange && <span className="text-[10px] text-orange-500 font-medium">전환</span>}
+              {!isUp && !isDown && !isTypeChange && <div className="h-3.5 w-3.5 rounded-full bg-muted" />}
               <span className="text-muted-foreground text-xs">{dateStr}</span>
             </div>
-            <span className={`font-medium ${isUp ? "text-red-500" : isDown ? "text-blue-500" : ""}`}>
-              {formatMoney(h.price)}
+            <span className={`font-medium ${isUp ? "text-red-500" : isDown ? "text-blue-500" : isTypeChange ? "text-orange-500" : ""}`}>
+              {rent > 0 ? `${formatMoney(warrant)}/${formatMoney(rent)}` : formatMoney(h.price)}
             </span>
           </div>
         );
@@ -109,7 +120,12 @@ export default function Dashboard() {
     title?: string;
     propertyType?: string;
     dealType?: string;
+    tradeTypeCode?: string;
     dong?: string;
+    warrantPrice?: number;
+    monthlyRent?: number;
+    prevWarrantPrice?: number;
+    prevMonthlyRent?: number;
   }[]>([]);
 
   useEffect(() => {
@@ -128,7 +144,12 @@ export default function Dashboard() {
           title: r.article_name,
           propertyType: r.property_type,
           dealType: r.trade_type,
+          tradeTypeCode: r.trade_type_code,
           dong: r.dong,
+          warrantPrice: r.warrant_price,
+          monthlyRent: r.monthly_rent,
+          prevWarrantPrice: r.prev_warrant_price,
+          prevMonthlyRent: r.prev_monthly_rent,
         })));
         if (rows.length > 0) setPriceChangesUpdatedAt(rows[0].updated_at);
         setPriceChangesLoading(false);
@@ -206,13 +227,23 @@ export default function Dashboard() {
                   <p className="text-[11px] text-muted-foreground">{c.dong && `${c.dong} · `}{c.propertyType} · {c.dealType}</p>
                   </div>
                 </div>
-                <div className="text-right shrink-0 ml-3">
+                <div className="text-right shrink-0 ml-3 group relative">
                   <p className={`text-sm font-bold ${isUp ? "text-red-500" : "text-blue-500"}`}>
                     {isUp ? "+" : ""}{c.rate.toFixed(1)}%
                   </p>
                   <p className="text-[11px] text-muted-foreground">
-                    {formatMoney(c.prevPrice)} → {formatMoney(c.price)}
+                    {formatPriceDisplay(c.prevWarrantPrice || 0, c.prevMonthlyRent || 0, c.tradeTypeCode)}
+                    {" → "}
+                    {formatPriceDisplay(c.warrantPrice || 0, c.monthlyRent || 0, c.tradeTypeCode)}
                   </p>
+                  {(c.tradeTypeCode === "B2" || c.tradeTypeCode === "B3") && (
+                    <div className="absolute bottom-full right-0 mb-1 hidden group-hover:block z-10 w-56 bg-popover text-popover-foreground text-[11px] rounded-md shadow-lg border border-border p-2.5 leading-relaxed">
+                      <p className="font-medium mb-1">환산보증금 (전환율 6%)</p>
+                      <p>보증금 + (월세 x 12 / 0.06)</p>
+                      <p className="mt-1 text-muted-foreground">이전: {formatMoney(c.prevPrice)}</p>
+                      <p className="text-muted-foreground">현재: {formatMoney(c.price)}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -230,6 +261,15 @@ export default function Dashboard() {
                 <div className="flex items-center gap-2 text-sm font-medium text-red-500">
                   <ArrowUpRight className="h-4 w-4" />
                   가격 상승 TOP
+                  <div className="relative group">
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                    <div className="absolute top-full left-0 mt-1 hidden group-hover:block z-10 w-60 bg-popover text-popover-foreground text-[11px] rounded-md shadow-lg border border-border p-2.5 leading-relaxed font-normal">
+                      <p className="font-medium mb-1">환산보증금 기준 비교</p>
+                      <p>월세 매물: 보증금 + (월세 x 12 / 전환율)</p>
+                      <p>전환율: 6% (마포구 상업용 기준)</p>
+                      <p className="mt-1 text-muted-foreground">거래유형 변경(전세→매매 등)은 제외</p>
+                    </div>
+                  </div>
                 </div>
                 {updatedStr && <span className="text-[11px] text-muted-foreground">{updatedStr}</span>}
               </div>
@@ -239,6 +279,15 @@ export default function Dashboard() {
               <div className="flex items-center gap-2 text-sm font-medium text-blue-500 mb-4">
                 <ArrowDownRight className="h-4 w-4" />
                 가격 하락 TOP
+                <div className="relative group">
+                  <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  <div className="absolute top-full left-0 mt-1 hidden group-hover:block z-10 w-60 bg-popover text-popover-foreground text-[11px] rounded-md shadow-lg border border-border p-2.5 leading-relaxed font-normal">
+                    <p className="font-medium mb-1">환산보증금 기준 비교</p>
+                    <p>월세 매물: 보증금 + (월세 x 12 / 전환율)</p>
+                    <p>전환율: 6% (마포구 상업용 기준)</p>
+                    <p className="mt-1 text-muted-foreground">거래유형 변경(전세→매매 등)은 제외</p>
+                  </div>
+                </div>
               </div>
               {renderList(decreases, false)}
             </div>

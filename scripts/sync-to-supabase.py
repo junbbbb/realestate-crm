@@ -23,6 +23,19 @@ if not url or not key:
 supabase = create_client(url, key)
 
 
+CONVERSION_RATE = 0.06  # 전월세 전환율 6% (마포구 상업용 기준)
+
+
+def converted_deposit(warrant, monthly_rent, trade_type):
+    """환산보증금: 거래유형별 비교 가능한 단일 가격 산출"""
+    if trade_type == "A1":       # 매매 → dealPrice 그대로 (warrant=dealPrice로 들어옴)
+        return warrant
+    if trade_type == "B1":       # 전세 → 보증금 그대로
+        return warrant
+    # 월세/단기임대 → 보증금 + (월세 × 12 ÷ 전환율)
+    return warrant + int(monthly_rent * 12 / CONVERSION_RATE) if monthly_rent else warrant
+
+
 def parse_int(v):
     if v is None:
         return 0
@@ -128,7 +141,7 @@ def main():
     existing = {}
     offset = 0
     while True:
-        resp = supabase.table("properties").select("id,price,deal_or_warrant_price,warrant_price,monthly_rent").range(offset, offset + 999).execute()
+        resp = supabase.table("properties").select("id,price,deal_or_warrant_price,warrant_price,monthly_rent,trade_type").range(offset, offset + 999).execute()
         for r in resp.data:
             existing[r["id"]] = r
         if len(resp.data) < 1000:
@@ -136,13 +149,14 @@ def main():
         offset += 1000
     print(f"기존 DB: {len(existing)}건")
 
-    # 가격 변동 감지
+    # 가격 변동 감지 (환산보증금 기준)
     price_history_rows = []
+    type_change_cnt = 0
     for row in rows:
         aid = row["id"]
         prev = existing.get(aid)
         if prev is None:
-            # 신규 매물 — initial price
+            # 신규 매물
             row["price_change"] = "new"
             row["prev_price"] = 0
             price_history_rows.append({
@@ -155,14 +169,37 @@ def main():
                 "change_type": "initial",
             })
         else:
-            # 가격 변경 체크
-            prev_price = prev.get("price") or 0
+            prev_trade = prev.get("trade_type") or ""
             prev_warrant = prev.get("warrant_price") or 0
             prev_rent = prev.get("monthly_rent") or 0
-            if prev_warrant != row["warrant_price"] or prev_rent != row["monthly_rent"] or prev_price != row["price"]:
-                change_type = "increase" if row["price"] > prev_price else "decrease"
+
+            # 거래유형 변경 → type_change (랭킹 제외)
+            if prev_trade and prev_trade != row["trade_type"]:
+                row["price_change"] = "type_change"
+                row["prev_price"] = prev.get("price") or 0
+                type_change_cnt += 1
+                price_history_rows.append({
+                    "article_no": aid,
+                    "deal_or_warrant_price": row["deal_or_warrant_price"],
+                    "rent_price": row["rent_price"],
+                    "warrant_price": row["warrant_price"],
+                    "monthly_rent": row["monthly_rent"],
+                    "price": row["price"],
+                    "change_type": "type_change",
+                })
+                continue
+
+            # 환산보증금으로 비교
+            cur_converted = converted_deposit(row["warrant_price"], row["monthly_rent"], row["trade_type"])
+            prev_converted = converted_deposit(prev_warrant, prev_rent, prev_trade)
+
+            if cur_converted != prev_converted:
+                change_type = "increase" if cur_converted > prev_converted else "decrease"
                 row["price_change"] = change_type
-                row["prev_price"] = prev_price
+                row["prev_price"] = prev_converted
+                row["_converted_price"] = cur_converted
+                row["_prev_warrant"] = prev_warrant
+                row["_prev_rent"] = prev_rent
                 price_history_rows.append({
                     "article_no": aid,
                     "deal_or_warrant_price": row["deal_or_warrant_price"],
@@ -174,9 +211,9 @@ def main():
                 })
             else:
                 row["price_change"] = "none"
-                row["prev_price"] = prev_price
+                row["prev_price"] = prev_converted
 
-    print(f"가격 히스토리: {len(price_history_rows)}건 (신규/변경)")
+    print(f"가격 히스토리: {len(price_history_rows)}건 (신규/변경), 거래유형변경: {type_change_cnt}건 (랭킹 제외)")
 
     # properties upsert (100건씩)
     for i in range(0, len(rows), 100):
@@ -197,34 +234,59 @@ def main():
                 print(f"  price_history 에러 @ {i}: {e}")
         print(f"  price_history {len(price_history_rows)}건 추가")
 
-    # 7일 미확인 매물 비활성화 (전체)
+    # 7일 미확인 매물 비활성화 (1000건씩 배치)
     cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
-    try:
-        resp = supabase.table("properties").update({"is_active": False}).lt("last_seen_at", cutoff).execute()
-        print(f"  is_active=false 처리: {len(resp.data)}건")
-    except Exception as e:
-        print(f"  deactivate 에러: {e}")
+    deactivated = 0
+    while True:
+        try:
+            batch = supabase.table("properties").select("id").eq("is_active", True).lt("last_seen_at", cutoff).limit(1000).execute()
+            if not batch.data:
+                break
+            ids = [r["id"] for r in batch.data]
+            supabase.table("properties").update({"is_active": False}).in_("id", ids).execute()
+            deactivated += len(ids)
+            print(f"  비활성화: {deactivated}건")
+        except Exception as e:
+            print(f"  deactivate 에러: {e}")
+            break
+    print(f"  is_active=false 처리 완료: {deactivated}건")
 
-    # 가격 변동 랭킹 계산
-    changes = [r for r in rows if r.get("price_change") in ("increase", "decrease") and (r.get("prev_price") or 0) >= 1000000 and r.get("price", 0) > 0]
-    increases = sorted([r for r in changes if r["price_change"] == "increase"], key=lambda r: (r["price"] - r["prev_price"]) / r["prev_price"] if r["prev_price"] else 0, reverse=True)[:6]
-    decreases = sorted([r for r in changes if r["price_change"] == "decrease"], key=lambda r: (r["price"] - r["prev_price"]) / r["prev_price"] if r["prev_price"] else 0)[:6]
+    # 가격 변동 랭킹 계산 (환산보증금 기준, type_change 제외)
+    changes = []
+    for r in rows:
+        if r.get("price_change") not in ("increase", "decrease"):
+            continue
+        cur_conv = r.get("_converted_price") or converted_deposit(r["warrant_price"], r["monthly_rent"], r["trade_type"])
+        prev_conv = r.get("prev_price") or 0
+        if prev_conv < 1000000 or cur_conv <= 0:
+            continue
+        r["_cur_conv"] = cur_conv
+        r["_prev_conv"] = prev_conv
+        changes.append(r)
+
+    increases = sorted([r for r in changes if r["price_change"] == "increase"], key=lambda r: (r["_cur_conv"] - r["_prev_conv"]) / r["_prev_conv"], reverse=True)[:6]
+    decreases = sorted([r for r in changes if r["price_change"] == "decrease"], key=lambda r: (r["_cur_conv"] - r["_prev_conv"]) / r["_prev_conv"])[:6]
 
     rankings = []
     trade_map = {"A1": "매매", "B1": "전세", "B2": "월세", "B3": "단기임대"}
     for r in increases + decreases:
-        prev = r.get("prev_price", 0)
-        cur = r.get("price", 0)
-        rate = ((cur - prev) / prev * 100) if prev else 0
+        prev_conv = r["_prev_conv"]
+        cur_conv = r["_cur_conv"]
+        rate = ((cur_conv - prev_conv) / prev_conv * 100) if prev_conv else 0
         rankings.append({
             "article_no": r["id"],
             "article_name": r.get("article_name", ""),
             "property_type": r.get("property_type", ""),
-            "trade_type": trade_map.get(r.get("real_estate_type", ""), r.get("trade_type", "")),
+            "trade_type": trade_map.get(r.get("trade_type", ""), r.get("trade_type_name", "")),
+            "trade_type_code": r.get("trade_type", ""),
             "change_type": r["price_change"],
-            "prev_price": prev,
-            "current_price": cur,
+            "prev_price": prev_conv,
+            "current_price": cur_conv,
             "rate": round(rate, 2),
+            "warrant_price": r.get("warrant_price", 0),
+            "monthly_rent": r.get("monthly_rent", 0),
+            "prev_warrant_price": r.get("_prev_warrant", 0),
+            "prev_monthly_rent": r.get("_prev_rent", 0),
         })
 
     if rankings:

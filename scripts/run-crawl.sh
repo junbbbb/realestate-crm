@@ -28,5 +28,16 @@ python3 scripts/extract-naver-cookie.py 2>&1 | tee -a "$LOG"
 python3 scripts/crawl-mapo-fin.py 2>&1 | tee -a "$LOG"
 EXIT_CODE=${PIPESTATUS[0]}
 
-echo "=== [$(date)] 크롤링 종료 (exit=$EXIT_CODE) ===" | tee -a "$LOG"
-exit $EXIT_CODE
+if [ "$EXIT_CODE" -ne 0 ]; then
+  echo "=== [$(date)] 크롤링 실패 (exit=$EXIT_CODE) ===" | tee -a "$LOG"
+  exit $EXIT_CODE
+fi
+
+# 3. Supabase 동기화 (가격 트래킹 포함)
+JSON=$(ls -t data/crawled-mapo-fin-*.json | head -1)
+echo "=== [$(date)] Supabase 동기화 시작: $JSON ===" | tee -a "$LOG"
+python3 scripts/sync-to-supabase.py "$JSON" 2>&1 | tee -a "$LOG"
+SYNC_CODE=${PIPESTATUS[0]}
+
+echo "=== [$(date)] 완료 (crawl=0, sync=$SYNC_CODE) ===" | tee -a "$LOG"
+exit $SYNC_CODE
