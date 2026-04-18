@@ -300,6 +300,10 @@ PROXY_PASS=...    # Decodo 프록시
 - `price_change_rankings`의 `property_type`: row dict에서 키 불일치 (`real_estate_type_name` vs `property_type`)
 - `naver_detail_cache` DB 레벨 자동 삭제 미구현 (fetched_at 인덱스 존재, cron 추가 예정)
 
+## 해결된 이슈
+
+- **2026-04-19: sync-to-supabase `_converted_price` 컬럼 에러** — `sync-to-supabase.py`가 랭킹 계산용 임시 키(`_converted_price`, `_prev_warrant`, `_prev_rent`)를 제거하지 않은 채 `properties` upsert payload에 포함시켜 PGRST204 발생. 한 배치(100건) 중 변동 매물 1건이라도 포함되면 **배치 전체 실패**하고, 연쇄적으로 `price_history` insert도 FK 위반으로 **배치 롤백**. 2026-04-19 크롤링에서 properties 최대 6,700건 / price_history 약 3,500건 누락. 수정: upsert 직전 `_` prefix 키 필터링. 재sync + 수동복구로 데이터 복원.
+
 ## 향후 TODO
 
 - [ ] naver_detail_cache 7일 초과 행 정리 (cron 또는 확률적)

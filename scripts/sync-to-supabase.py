@@ -221,10 +221,12 @@ def main():
     print(f"가격 히스토리: {len(price_history_rows)}건 (신규/변경), 거래유형변경: {type_change_cnt}건 (랭킹 제외)")
 
     # properties upsert (100건씩)
+    # `_`로 시작하는 키는 스크립트 내부 임시값(랭킹 계산용) — DB 컬럼 아님
     for i in range(0, len(rows), 100):
         batch = rows[i:i + 100]
+        clean_batch = [{k: v for k, v in r.items() if not k.startswith("_")} for r in batch]
         try:
-            supabase.table("properties").upsert(batch, on_conflict="id").execute()
+            supabase.table("properties").upsert(clean_batch, on_conflict="id").execute()
             print(f"  upsert {i + len(batch)}/{len(rows)}")
         except Exception as e:
             print(f"  에러 @ {i}: {e}")
