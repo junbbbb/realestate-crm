@@ -1,5 +1,27 @@
 # 설계 결정 기록 — BEST MOUNTAIN
 
+## 2026-04-21
+
+### 1. 7일 미확인 매물 비활성화 쿼리 최적화
+
+**문제**: 일일 크롤링의 마지막 단계 `is_active=false` 처리에서 Supabase statement_timeout(57014) 발생 → 0건 처리 상태로 종료.
+
+**원인**:
+- properties 테이블이 커지면서 `is_active=true` 행이 전체의 대부분을 차지
+- 기존 복합 인덱스 `(is_active, last_seen_at DESC)`의 `is_active=true` 파티션이 너무 넓어 실효 성능 저하
+- 한 번에 1000건 select + in_ update 왕복이 statement_timeout을 넘김
+
+**결정**:
+1. `is_active=true` 전용 partial index 추가
+   - `CREATE INDEX properties_active_last_seen_partial_idx ON properties(last_seen_at) WHERE is_active = true`
+   - 인덱스 크기가 훨씬 작아 `last_seen_at < cutoff` 스캔이 수십 ms로 떨어짐
+2. 비활성화 배치 크기 1000 → 200으로 축소
+   - update 왕복 시간도 분산되어 안정성 확보
+
+**효과**: 9,031건 비활성화 처리 37초 내 완료 (이전엔 timeout으로 0건).
+
+**마이그레이션**: `supabase/migrations/20260421120000_partial_index_inactive_candidates.sql`
+
 ## 2026-04-06
 
 ### 1. 거래 관리 구조: deals 테이블 분리

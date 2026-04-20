@@ -183,7 +183,7 @@ status, total_count, new_count, updated_count, duration, message
 2. sync-to-supabase.py -- JSON -> Supabase upsert
    -> 환산보증금 기준 가격 변동 감지 -> price_history 기록
    -> 거래유형 변경 감지 -> type_change 기록 (랭킹 제외)
-   -> 7일 미확인 -> is_active=false (1000건씩 배치)
+   -> 7일 미확인 -> is_active=false (200건씩 배치, partial index 사용)
    -> 가격 변동 랭킹 계산 -> price_change_rankings 갱신 (보증금/월세 상세 포함)
 ```
 

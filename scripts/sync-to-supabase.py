@@ -246,7 +246,7 @@ def main():
     deactivated = 0
     while True:
         try:
-            batch = supabase.table("properties").select("id").eq("is_active", True).lt("last_seen_at", cutoff).limit(1000).execute()
+            batch = supabase.table("properties").select("id").eq("is_active", True).lt("last_seen_at", cutoff).limit(200).execute()
             if not batch.data:
                 break
             ids = [r["id"] for r in batch.data]
