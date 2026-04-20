@@ -286,6 +286,7 @@ def main():
             "property_type": r.get("property_type", ""),
             "trade_type": trade_map.get(r.get("trade_type", ""), r.get("trade_type_name", "")),
             "trade_type_code": r.get("trade_type", ""),
+            "dong": r.get("dong", ""),
             "change_type": r["price_change"],
             "prev_price": prev_conv,
             "current_price": cur_conv,

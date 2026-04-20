@@ -22,6 +22,16 @@
 
 **마이그레이션**: `supabase/migrations/20260421120000_partial_index_inactive_candidates.sql`
 
+### 2. 대시보드 가격 변동 카드 동 표시 누락 버그 수정
+
+**증상**: 대시보드 가격 변동 카드에 "용강동 · 상가 · 월세" 형태의 동 정보가 전혀 표시되지 않음.
+
+**원인**: `sync-to-supabase.py`의 `price_change_rankings` insert 로직이 `dong` 필드를 빠뜨리고 있었음. 테이블 스키마(`20260407120000_add_dong_to_rankings.sql`)와 UI(`page.tsx`)는 모두 `dong` 지원 중이라 DB에 NULL만 누적.
+
+**수정**:
+1. rankings insert에 `"dong": r.get("dong", "")` 추가 — 다음 크롤링부터 자동 기록
+2. 기존 랭킹 9건은 `properties.dong` 조회로 1회 백필 완료
+
 ## 2026-04-06
 
 ### 1. 거래 관리 구조: deals 테이블 분리
